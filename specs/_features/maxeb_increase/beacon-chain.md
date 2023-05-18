@@ -7,11 +7,30 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Introduction](#introduction)
+- [Custom types](#custom-types)
+  - [Domain types](#domain-types)
 - [Constants](#constants)
   - [Withdrawal prefixes](#withdrawal-prefixes)
+  - [Gwei values](#gwei-values)
+- [Containers](#containers)
+  - [New containers](#new-containers)
+    - [<span style="background-color: #FFFF00">new</span> `ExecutionToCompoundingChange`](#span-stylebackground-color-ffff00newspan-executiontocompoundingchange)
+    - [<span style="background-color: #FFFF00">new</span>  `SignedExecutionToCompoundingChange`](#span-stylebackground-color-ffff00newspan--signedexecutiontocompoundingchange)
+- [Helpers](#helpers)
+  - [Math](#math)
+    - [<span style="background-color: #FFFF00">new</span> `is_power_of_two`](#span-stylebackground-color-ffff00newspan-is_power_of_two)
+    - [<span style="background-color: #FFFF00">new</span> `bytes_to_uint16`](#span-stylebackground-color-ffff00newspan-bytes_to_uint16)
+  - [Misc](#misc)
+    - [<span style="background-color: #FFFF00">new</span>  `calculate_balance_ceiling`](#span-stylebackground-color-ffff00newspan--calculate_balance_ceiling)
+  - [Predicates](#predicates)
+    - [<span style="background-color: #FFFF00">new</span> `has_compounding_withdrawal_credential`](#span-stylebackground-color-ffff00newspan-has_compounding_withdrawal_credential)
+    - [<span style="background-color: #FFFF00">new</span> `has_withdrawalable_credential`](#span-stylebackground-color-ffff00newspan-has_withdrawalable_credential)
+    - [<span style="background-color: #FFFF00">updated</span>  `is_fully_withdrawable_validator`](#span-stylebackground-color-ffff00updatedspan--is_fully_withdrawable_validator)
+    - [<span style="background-color: #FFFF00">updated</span>  `is_partially_withdrawable_validator`](#span-stylebackground-color-ffff00updatedspan--is_partially_withdrawable_validator)
 - [Beacon chain state transition function](#beacon-chain-state-transition-function)
   - [Block processing](#block-processing)
-    - [New `process_compounding_withdrawal`](#new-process_compounding_withdrawal)
+    - [<span style="background-color: #FFFF00">updated</span>  `get_expected_withdrawals`](#span-stylebackground-color-ffff00updatedspan--get_expected_withdrawals)
+    - [<span style="background-color: #FFFF00">new</span>  `process_compounding_withdrawal`](#span-stylebackground-color-ffff00newspan--process_compounding_withdrawal)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <!-- /TOC -->
