@@ -169,6 +169,52 @@ class BeaconBlockBody(Container):
     execution_payload: ExecutionPayload
     bls_to_execution_changes: List[SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES] 
     execution_to_compounding_changes: List[SignedExecutionToCompoundingChange, MAX_EXECUTION_TO_COMPOUNDING_CHANGES] # new
+    blob_kzg_commitments: List[KZGCommitment, MAX_BLOBS_PER_BLOCK] 
+```
+
+#### `BeaconState`
+
+*Note*: adding `exit_queue_churn` field, keeping track of the total balance of validators whose exit epoch is the latest assigned one.
+
+```python
+class BeaconState(Container):
+    # Versioning
+    genesis_time: uint64
+    genesis_validators_root: Root
+    slot: Slot
+    fork: Fork
+    # History
+    latest_block_header: BeaconBlockHeader
+    block_roots: Vector[Root, SLOTS_PER_HISTORICAL_ROOT]
+    state_roots: Vector[Root, SLOTS_PER_HISTORICAL_ROOT]
+    historical_roots: List[Root, HISTORICAL_ROOTS_LIMIT]
+    # Eth1
+    eth1_data: Eth1Data
+    eth1_data_votes: List[Eth1Data, EPOCHS_PER_ETH1_VOTING_PERIOD * SLOTS_PER_EPOCH]
+    eth1_deposit_index: uint64
+    # Registry
+    validators: List[Validator, VALIDATOR_REGISTRY_LIMIT]
+    balances: List[Gwei, VALIDATOR_REGISTRY_LIMIT]
+    exit_queue_churn: Gwei # new
+    # Randomness
+    randao_mixes: Vector[Bytes32, EPOCHS_PER_HISTORICAL_VECTOR]
+    # Slashings
+    slashings: Vector[Gwei, EPOCHS_PER_SLASHINGS_VECTOR]  # Per-epoch sums of slashed effective balances
+    # Participation
+    previous_epoch_participation: List[ParticipationFlags, VALIDATOR_REGISTRY_LIMIT]
+    current_epoch_participation: List[ParticipationFlags, VALIDATOR_REGISTRY_LIMIT]
+    # Finality
+    justification_bits: Bitvector[JUSTIFICATION_BITS_LENGTH]  # Bit set for every recent justified epoch
+    previous_justified_checkpoint: Checkpoint
+    current_justified_checkpoint: Checkpoint
+    finalized_checkpoint: Checkpoint
+    # Inactivity
+    inactivity_scores: List[uint64, VALIDATOR_REGISTRY_LIMIT]
+    # Sync
+    current_sync_committee: SyncCommittee
+    next_sync_committee: SyncCommittee
+    # Execution
+    latest_execution_payload_header: ExecutionPayloadHeader
 ```
 
 ## Helpers
@@ -317,13 +363,13 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
     exit_epochs = [v.exit_epoch for v in state.validators if v.exit_epoch != FAR_FUTURE_EPOCH]
     exit_queue_epoch = max(exit_epochs + [compute_activation_exit_epoch(get_current_epoch(state))])
     if exit_queue_epoch > max(exit_epochs): 
-        state.exit_queue_churn = Gwei(0)  # state.exit_epoch_churn is a new field, recording the current amount of churn in the exit_queue_epoch
+        state.exit_queue_churn = Gwei(0)
     churn_limit = get_validator_churn_limit(state)
     if state.exit_queue_churn + validator.effective_balance <= churn_limit: # the validator fits within the churn of the current exit_queue_epoch
         state.exit_queue_churn += validator.effective_balance # the full effective balance of the validator contributes to the churn in the exit queue epoch 
     else: # the validator fits within the churn of the current exit_queue_epoch
         future_epochs_churn_contribution = validator.effective_balance - (churn_limit - state.exit_queue_churn)
-        exit_queue_epoch += Epoch((future_epochs_churn_contribution + churn_limit - 1) // churn_limit) # (numerator + denominator - 1) // denominator rounds up. 
+        exit_queue_epoch += Epoch((future_epochs_churn_contribution + churn_limit - 1) // churn_limit # (numerator + denominator - 1) // denominator rounds up. 
         # the validator contributes to the churn in the exit queue epoch, based on how much balance is left over at that point 
         if future_epochs_churn_contribution % churn_limit == 0:
             state.exit_queue_churn = churn_limit
