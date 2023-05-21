@@ -9,7 +9,7 @@ from typing import (
 
 from eth2spec.utils.ssz.ssz_impl import hash_tree_root, copy, uint_to_bytes
 from eth2spec.utils.ssz.ssz_typing import (
-    View, boolean, Container, List, Vector, uint8, uint32, uint64,
+    View, boolean, Container, List, Vector, uint8, uint16, uint32, uint64,
     Bytes1, Bytes4, Bytes32, Bytes48, Bytes96, Bitlist)
 from eth2spec.utils.ssz.ssz_typing import Bitvector  # noqa: F401
 from eth2spec.utils import bls
@@ -211,6 +211,7 @@ WHISTLEBLOWER_REWARD_QUOTIENT = uint64(512)
 PROPOSER_REWARD_QUOTIENT = uint64(8)
 INACTIVITY_PENALTY_QUOTIENT = uint64(67108864)
 MIN_SLASHING_PENALTY_QUOTIENT = uint64(128)
+MIN_PROPOSER_SLASHING = Gwei(1000000000)
 PROPORTIONAL_SLASHING_MULTIPLIER = uint64(1)
 MAX_PROPOSER_SLASHINGS = 16
 MAX_ATTESTER_SLASHINGS = 2
@@ -1176,7 +1177,7 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
         return
 
     # Compute exit queue epoch
-        exit_epochs = [v.exit_epoch for v in state.validators if v.exit_epoch != FAR_FUTURE_EPOCH]
+    exit_epochs = [v.exit_epoch for v in state.validators if v.exit_epoch != FAR_FUTURE_EPOCH]
     exit_queue_epoch = max(exit_epochs + [compute_activation_exit_epoch(get_current_epoch(state))])
     if exit_queue_epoch > max(exit_epochs): 
         state.exit_queue_churn = Gwei(0)
@@ -1193,12 +1194,13 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
             state.exit_queue_churn = future_epochs_churn_contribution % churn_limit
     # Set validator exit epoch and withdrawable epoch
     validator.exit_epoch = exit_queue_epoch
-    validator.withdrawable_epoch = Epoch(validator.exit_epoch + MIN_VALIDATOR_WITHDRAWABILITY_DELAY)
+    validator.withdrawable_epoch = Epoch(validator.exit_epoch + config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY)
 
 
 def slash_validator(state: BeaconState,
                     slashed_index: ValidatorIndex,
-                    whistleblower_index: ValidatorIndex=None) -> None:
+                    whistleblower_index: ValidatorIndex=None,
+                    is_proposer_slashing: bool=False) -> None:
     """
     Slash the validator with index ``slashed_index``.
     """
@@ -1208,8 +1210,8 @@ def slash_validator(state: BeaconState,
     validator.slashed = True
     validator.withdrawable_epoch = max(validator.withdrawable_epoch, Epoch(epoch + EPOCHS_PER_SLASHINGS_VECTOR))
     state.slashings[epoch % EPOCHS_PER_SLASHINGS_VECTOR] += validator.effective_balance
-    slashing_penalty = validator.effective_balance // MIN_SLASHING_PENALTY_QUOTIENT_BELLATRIX  # [Modified in Bellatrix]
-    decrease_balance(state, slashed_index, slashing_penalty)
+    min_slashing_amount = MIN_PROPOSER_SLASHING if is_proposer_slashing else validator.effective_balance // MIN_SLASHING_PENALTY_QUOTIENT
+    decrease_balance(state, slashed_index, min_slashing_amount)
 
     # Apply proposer and whistleblower rewards
     proposer_index = get_beacon_proposer_index(state)
@@ -3598,7 +3600,7 @@ def has_compounding_withdrawal_credential(validator: Validator) -> bool:
     return validator.withdrawal_credentials[:1] == COMPOUNDING_WITHDRAWAL_PREFIX
 
 
-def has_withdrawalable_credential(validator: Validator) -> bool:
+def has_withdrawable_credential(validator: Validator) -> bool:
     """
     Check if ``validator`` has a withdrawable credential.
     """
@@ -3610,7 +3612,7 @@ def is_fully_withdrawable_validator(validator: Validator, balance: Gwei, epoch: 
     Check if ``validator`` is fully withdrawable.
     """
     return (
-        has_withdrawalable_credential(validator)
+        has_withdrawable_credential(validator)
         and validator.withdrawable_epoch <= epoch
         and balance > 0
     )
@@ -3621,7 +3623,7 @@ def is_partially_withdrawable_validator(validator: Validator, balance: Gwei) -> 
     Check if ``validator`` is partially withdrawable.
     """
     if not has_withdrawable_credential(validator):
-        return false
+        return False
     
     ceiling = get_balance_ceiling(validator)
     has_ceiling_effective_balance = validator.effective_balance == ceiling
