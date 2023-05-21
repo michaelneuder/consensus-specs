@@ -821,7 +821,7 @@ def is_eligible_for_activation_queue(validator: Validator) -> bool:
     """
     return (
         validator.activation_eligibility_epoch == FAR_FUTURE_EPOCH
-        and validator.effective_balance == MIN_ACTIVATION_BALANCE
+        and validator.effective_balance >= MIN_ACTIVATION_BALANCE
     )
 
 
@@ -1004,9 +1004,10 @@ def get_balance_ceiling(validator: Validator) -> Gwei:
     """
     Return the balance ceiling for a validator.
     """
+    # Default to 32 ETH ceiling (as in Capella).
     if not has_compounding_withdrawal_credential(validator):
         return MIN_ACTIVATION_BALANCE
-    # With compounding credential bytes [1-2] are the ceiling in ETH.
+    # With compounding credential, bytes [1-2] of the credential are the ceiling denominated in ETH.
     return bytes_to_uint16(validator.withdrawal_credential[1:3]) * EFFECTIVE_BALANCE_INCREMENT
 
 
@@ -3660,7 +3661,7 @@ def get_expected_withdrawals(state: BeaconState) -> Sequence[Withdrawal]:
             ))
             withdrawal_index += WithdrawalIndex(1)
         elif is_partially_withdrawable_validator(validator, balance):
-            ceiling = get_balance_ceiling(validator) # modified
+            ceiling = get_balance_ceiling(validator)
             withdrawals.append(Withdrawal(
                 index=withdrawal_index,
                 validator_index=validator_index,
@@ -3735,7 +3736,7 @@ def process_execution_to_compounding_change(state: BeaconState,
     assert is_power_of_two(compounding_change.balance_ceiling)
 
     # Check that balance_ceiling is greater than MIN_ACTIVATION_BALANCE.
-    assert compounding_change.balance_ceiling >= MIN_ACTIVATION_BALANCE
+    assert compounding_change.balance_ceiling > MIN_ACTIVATION_BALANCE
 
     # Check that balance_ceiling is less than MaxEB.
     assert compounding_change.balance_ceiling <= MAX_EFFECTIVE_BALANCE
