@@ -1055,7 +1055,7 @@ def get_active_validator_indices(state: BeaconState, epoch: Epoch) -> Sequence[V
     return [ValidatorIndex(i) for i, v in enumerate(state.validators) if is_active_validator(v, epoch)]
 
 
-def get_validator_churn_limit(state: BeaconState) -> uint64:
+def get_validator_churn_limit(state: BeaconState) -> Gwei:
     """
     Return the validator churn limit for the current epoch.
     """
