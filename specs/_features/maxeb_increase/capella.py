@@ -1055,7 +1055,7 @@ def get_active_validator_indices(state: BeaconState, epoch: Epoch) -> Sequence[V
     return [ValidatorIndex(i) for i, v in enumerate(state.validators) if is_active_validator(v, epoch)]
 
 
-def get_validator_churn_limit(state: BeaconState) -> uint64:
+def get_validator_churn_limit(state: BeaconState) -> Gwei:
     """
     Return the validator churn limit for the current epoch.
     """
@@ -1185,9 +1185,9 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
     churn_limit = get_validator_churn_limit(state)
     if state.exit_queue_churn + validator.effective_balance <= churn_limit: # the validator fits within the churn of the current exit_queue_epoch
         state.exit_queue_churn += validator.effective_balance # the full effective balance of the validator contributes to the churn in the exit queue epoch 
-    else: # the validator fits within the churn of the current exit_queue_epoch
+    else: # the validator does not fit within the churn of the current exit_queue_epoch
         future_epochs_churn_contribution = validator.effective_balance - (churn_limit - state.exit_queue_churn)
-        exit_queue_epoch += Epoch(future_epochs_churn_contribution + churn_limit - 1) // churn_limit # (numerator + denominator - 1) // denominator rounds up. 
+        exit_queue_epoch += Epoch((future_epochs_churn_contribution + churn_limit - 1) // churn_limit) # (numerator + denominator - 1) // denominator rounds up. 
         # the validator contributes to the churn in the exit queue epoch, based on how much balance is left over at that point 
         if future_epochs_churn_contribution % churn_limit == 0:
             state.exit_queue_churn = churn_limit
