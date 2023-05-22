@@ -3736,7 +3736,7 @@ def process_execution_to_compounding_change(state: BeaconState,
     assert is_power_of_two(compounding_change.balance_ceiling)
 
     # Check that balance_ceiling is greater than MIN_ACTIVATION_BALANCE.
-    assert compounding_change.balance_ceiling > MIN_ACTIVATION_BALANCE
+    assert compounding_change.balance_ceiling >= MIN_ACTIVATION_BALANCE
 
     # Check that balance_ceiling is less than MaxEB.
     assert compounding_change.balance_ceiling <= MAX_EFFECTIVE_BALANCE
