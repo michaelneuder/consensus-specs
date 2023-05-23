@@ -9,12 +9,13 @@ from eth2spec.bellatrix import mainnet as spec_bellatrix_mainnet, minimal as spe
 from eth2spec.capella import mainnet as spec_capella_mainnet, minimal as spec_capella_minimal
 from eth2spec.deneb import mainnet as spec_deneb_mainnet, minimal as spec_deneb_minimal
 from eth2spec.eip6110 import mainnet as spec_eip6110_mainnet, minimal as spec_eip6110_minimal
+from eth2spec.maxeb import mainnet as spec_maxeb_mainnet, minimal as spec_maxeb_minimal
 from eth2spec.utils import bls
 
 from .exceptions import SkippedTest
 from .helpers.constants import (
     PHASE0, ALTAIR, BELLATRIX, CAPELLA, DENEB,
-    EIP6110,
+    EIP6110, MAXEB,
     MINIMAL, MAINNET,
     ALL_PHASES,
     ALL_FORK_UPGRADES,
@@ -82,6 +83,7 @@ spec_targets: Dict[PresetBaseName, Dict[SpecForkName, Spec]] = {
         CAPELLA: spec_capella_minimal,
         DENEB: spec_deneb_minimal,
         EIP6110: spec_eip6110_minimal,
+        MAXEB: spec_maxeb_minimal,
     },
     MAINNET: {
         PHASE0: spec_phase0_mainnet,
@@ -90,6 +92,7 @@ spec_targets: Dict[PresetBaseName, Dict[SpecForkName, Spec]] = {
         CAPELLA: spec_capella_mainnet,
         DENEB: spec_deneb_mainnet,
         EIP6110: spec_eip6110_mainnet,
+        MAXEB: spec_maxeb_mainnet,
     },
 }
 
