@@ -9,7 +9,7 @@ from .exceptions import SkippedTest
 from .helpers.constants import (
     PHASE0, ALTAIR, BELLATRIX, CAPELLA, DENEB,
     EIP6110, EIP7002, EIP7594,
-    WHISK,
+    WHISK, MAXEB,
     MINIMAL,
     ALL_PHASES,
     POST_FORK_OF,
