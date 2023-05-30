@@ -55,14 +55,14 @@ The following values are (non-configurable) constants used throughout the specif
 | - | - |
 | `BLS_WITHDRAWAL_PREFIX` | `Bytes1('0x00')` |
 | `ETH1_ADDRESS_WITHDRAWAL_PREFIX` | `Bytes1('0x01')` |
-| new `COMPOUNDING_WITHDRAWAL_PREFIX` | `Bytes1('0x02')` |
+| `COMPOUNDING_WITHDRAWAL_PREFIX` | `Bytes1('0x02')` |
 
 ### Gwei values
 
 | Name | Value |
 | - | - |
-| new `MIN_ACTIVATION_BALANCE` | `Gwei(2**5 * 10**9)`  (32 ETH) |
-| updated `MAX_EFFECTIVE_BALANCE_MAXEB` | `Gwei(2**11 * 10**9)` (2048 ETH) |
+| `MIN_ACTIVATION_BALANCE` | `Gwei(2**5 * 10**9)`  (32 ETH) |
+| `MAX_EFFECTIVE_BALANCE_MAXEB` | `Gwei(2**11 * 10**9)` (2048 ETH) |
 
 ## Containers
 
