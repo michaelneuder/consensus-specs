@@ -10,8 +10,6 @@
 - [Constants](#constants)
   - [Withdrawal prefixes](#withdrawal-prefixes)
   - [Gwei values](#gwei-values)
-- [Configuration](#configuration)
-  - [Validator cycle](#validator-cycle)
 - [Containers](#containers)
   - [New containers](#new-containers)
   - [Extended Containers](#extended-containers)
@@ -20,8 +18,8 @@
   - [Predicates](#predicates)
     - [updated `is_eligible_for_activation_queue`](#updated-is_eligible_for_activation_queue)
     - [new `has_compounding_withdrawal_credential`](#new-has_compounding_withdrawal_credential)
-    - [new `has_withdrawalable_credential`](#new-has_withdrawalable_credential)
     - [updated  `is_fully_withdrawable_validator`](#updated--is_fully_withdrawable_validator)
+    - [new `get_validator_excess_balance`](#new-get_validator_excess_balance)
     - [updated  `is_partially_withdrawable_validator`](#updated--is_partially_withdrawable_validator)
   - [Beacon state accessors](#beacon-state-accessors)
     - [updated  `get_validator_churn_limit`](#updated--get_validator_churn_limit)
@@ -34,6 +32,8 @@
     - [updated  `process_registry_updates`](#updated--process_registry_updates)
   - [Block processing](#block-processing)
     - [updated  `get_expected_withdrawals`](#updated--get_expected_withdrawals)
+    - [Operations](#operations)
+      - [Deposits](#deposits)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <!-- /TOC -->
@@ -64,14 +64,6 @@ The following values are (non-configurable) constants used throughout the specif
 | new `MIN_ACTIVATION_BALANCE` | `Gwei(2**5 * 10**9)`  (32 ETH) |
 | updated `MAX_EFFECTIVE_BALANCE` | `Gwei(2**11 * 10**9)` (2048 ETH) |
 
-## Configuration
-
-### Validator cycle
-
-| Name | Value |
-| - | - |
-| updated `MIN_PER_EPOCH_CHURN_LIMIT` | `Gwei(2**7 * 10**9)` (128 ETH) |
-
 ## Containers
 
 ### New containers
@@ -80,7 +72,9 @@ The following values are (non-configurable) constants used throughout the specif
 
 #### `BeaconState`
 
-*Note*: adding `exit_queue_churn` field, keeping track of the total balance of validators whose exit epoch is the latest assigned one.
+*Note*: adding `activation_validator_balance` and `exit_queue_churn` fields to
+aid in rate limiting of activation and exit queue based on ETH rather than
+validator counts.
 
 ```python
 class BeaconState(Container):
@@ -101,7 +95,12 @@ class BeaconState(Container):
     # Registry
     validators: List[Validator, VALIDATOR_REGISTRY_LIMIT]
     balances: List[Gwei, VALIDATOR_REGISTRY_LIMIT]
-    exit_queue_churn: Gwei # new
+
+    # --- NEW --- #
+    activation_validator_balance: Gwei
+    exit_queue_churn: Gwei 
+    # --- END NEW --- #
+
     # Randomness
     randao_mixes: Vector[Bytes32, EPOCHS_PER_HISTORICAL_VECTOR]
     # Slashings
@@ -138,7 +137,9 @@ def is_eligible_for_activation_queue(validator: Validator) -> bool:
     """
     return (
         validator.activation_eligibility_epoch == FAR_FUTURE_EPOCH
-        and validator.effective_balance >= MIN_ACTIVATION_BALANCE # modfied
+        # --- MODIFIED --- #
+        and validator.effective_balance >= MIN_ACTIVATION_BALANCE
+        # --- END MODIFIED --- #
     )
 ```
 
@@ -152,19 +153,9 @@ def has_compounding_withdrawal_credential(validator: Validator) -> bool:
     return validator.withdrawal_credentials[:1] == COMPOUNDING_WITHDRAWAL_PREFIX
 ```
 
-#### new `has_withdrawalable_credential`
-
-```python
-def has_withdrawalable_credential(validator: Validator) -> bool:
-    """
-    Check if ``validator`` has a withdrawable credential.
-    """
-    return has_eth1_withdrawal_credential(validator) or has_compounding_withdrawal_credential(validator)
-```
-
 #### updated  `is_fully_withdrawable_validator`
 
-*Note*: now calls `has_withdrawalable_credential`.  
+*Note*: now calls `has_compounding_withdrawal_credential` too.  
 
 ```python
 def is_fully_withdrawable_validator(validator: Validator, balance: Gwei, epoch: Epoch) -> bool:
@@ -172,10 +163,26 @@ def is_fully_withdrawable_validator(validator: Validator, balance: Gwei, epoch: 
     Check if ``validator`` is fully withdrawable.
     """
     return (
-        has_withdrawalable_credential(validator) # modified
+        # --- MODIFIED --- #
+        (has_eth1_withdrawal_credential(validator) or has_compounding_withdrawal_credential(validator))
+        # --- END MODIFIED --- #
         and validator.withdrawable_epoch <= epoch
         and balance > 0
     )
+```
+
+#### new `get_validator_excess_balance`
+
+```python
+def get_validator_excess_balance(validator: Validator, balance: Gwei) -> Gwei:
+    """
+    Get excess balance for partial withdrawals for ``validator``.
+    """
+    if has_compounding_withdrawal_credential(validator) and balance > MAX_EFFECTIVE_BALANCE:
+        return balance - MAX_EFFECTIVE_BALANCE
+    elif has_eth1_withdrawal_credential(validator) and balance > MIN_ACTIVATION_BALANCE:
+        return balance - MIN_ACTIVATION_BALANCE
+    return Gwei(0)
 ```
 
 ####  updated  `is_partially_withdrawable_validator`
@@ -186,30 +193,21 @@ def is_partially_withdrawable_validator(validator: Validator, balance: Gwei) -> 
     """
     Check if ``validator`` is partially withdrawable.
     """
-    if not has_withdrawable_credential(validator):
-        return False
-    if has_eth1_withdrawal_credential(validator):
-        ceiling = MIN_ACTIVATION_BALANCE
-    elif has_compounding_withdrawal_credential(validator):
-        ceiling = MAX_EFFECTIVE_BALANCE
-    has_ceiling_balance = validator.effective_balance == ceiling
-    has_excess_balance = balance > ceiling
-    return has_ceiling_balance and has_excess_balance
+    # --- MODIFIED --- #
+    return get_validator_excess_balance(validator, balance) > 0
+    # --- END MODIFIED --- #
 ```
 
 ### Beacon state accessors
 #### updated  `get_validator_churn_limit`
 
-*Note*: updated to do a weight based calculation of the amount of validators that 
-can exit per epoch. This is based on the new value of `MIN_PER_EPOCH_CHURN_LIMIT=128 ETH`,
-which is equivalent to four 32 ETH validators. `CHURN_LIMIT_QUOTIENT` remains unchanged,
-because it denotes the fraction of total weight that we are comfortable losing per epoch:
-$1/65536$
+*Note*: updated to return a Gwei amount of amount of churn per epoch.
 
 ```python
+# --- MODIFIED --- #
 def get_validator_churn_limit(state: BeaconState) -> Gwei:
-    total_balance = get_total_active_balance(state)
     return max(MIN_PER_EPOCH_CHURN_LIMIT, total_balance // CHURN_LIMIT_QUOTIENT)
+# --- END MODIFIED --- #
 ```
 
 ### Beacon state mutators
@@ -228,23 +226,24 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
     validator = state.validators[index]
     if validator.exit_epoch != FAR_FUTURE_EPOCH:
         return
-    # ---- BELOW IS UPDATED ----
     # Compute exit queue epoch
     exit_epochs = [v.exit_epoch for v in state.validators if v.exit_epoch != FAR_FUTURE_EPOCH]
     exit_queue_epoch = max(exit_epochs + [compute_activation_exit_epoch(get_current_epoch(state))])
-    if exit_queue_epoch > max(exit_epochs): 
-        state.exit_queue_churn = Gwei(0)
-    churn_limit = get_validator_churn_limit(state)
-    if state.exit_queue_churn + validator.effective_balance <= churn_limit: # the validator fits within the churn of the current exit_queue_epoch
-        state.exit_queue_churn += validator.effective_balance # the full effective balance of the validator contributes to the churn in the exit queue epoch 
-    else: # the validator fits within the churn of the current exit_queue_epoch
-        future_epochs_churn_contribution = validator.effective_balance - (churn_limit - state.exit_queue_churn)
-        exit_queue_epoch += Epoch((future_epochs_churn_contribution + churn_limit - 1) // churn_limit # (numerator + denominator - 1) // denominator rounds up. 
-        # the validator contributes to the churn in the exit queue epoch, based on how much balance is left over at that point 
-        if future_epochs_churn_contribution % churn_limit == 0:
-            state.exit_queue_churn = churn_limit
-        else:
-            state.exit_queue_churn = future_epochs_churn_contribution % churn_limit
+
+    # --- MODIFIED --- #
+    exit_balance_to_consume = validator.effective_balance
+    per_epoch_churn_limit = get_validator_churn_limit(state)
+    if state.exit_queue_churn + exit_balance_to_consume <= per_epoch_churn_limit:
+        state.exit_queue_churn += exit_balance_to_consume
+    else:  # Exit balance rolls over to subsequent epoch(s)
+        exit_balance_to_consume -= (per_epoch_churn_limit - state.exit_queue_churn)
+        exit_queue_epoch += Epoch(1)
+        while exit_balance_to_consume >= per_epoch_churn_limit:
+            exit_balance_to_consume -= per_epoch_churn_limit
+            exit_queue_epoch += Epoch(1)
+        state.exit_queue_churn = exit_balance_to_consume
+    # --- END MODIFIED --- #
+
     # Set validator exit epoch and withdrawable epoch
     validator.exit_epoch = exit_queue_epoch
     validator.withdrawable_epoch = Epoch(validator.exit_epoch + MIN_VALIDATOR_WITHDRAWABILITY_DELAY)
@@ -252,8 +251,8 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
 
 ## Genesis
 ####  updated  `initialize_beacon_state_from_eth1`
-*Note*: Replace `== MAX_EFFECTIVE_BALANCE` with `>= MIN_ACTIVATION_BALANCE` when checking
-for activation processing.
+*Note*: Replace `== MAX_EFFECTIVE_BALANCE` with `>= MIN_ACTIVATION_BALANCE` when 
+checking for activation processing.
 ```python
 def initialize_beacon_state_from_eth1(eth1_block_hash: Hash32,
                                       eth1_timestamp: uint64,
@@ -280,7 +279,11 @@ def initialize_beacon_state_from_eth1(eth1_block_hash: Hash32,
     for index, validator in enumerate(state.validators):
         balance = state.balances[index]
         validator.effective_balance = min(balance - balance % EFFECTIVE_BALANCE_INCREMENT, MAX_EFFECTIVE_BALANCE)
-        if validator.effective_balance >= MIN_ACTIVATION_BALANCE: # updated
+        
+        # --- MODIFIED --- #
+        if validator.effective_balance >= MIN_ACTIVATION_BALANCE: 
+        # --- END MODIFIED --- #
+        
             validator.activation_eligibility_epoch = GENESIS_EPOCH
             validator.activation_epoch = GENESIS_EPOCH
     # Set genesis validators root for domain separation and chain versioning
@@ -292,7 +295,7 @@ def initialize_beacon_state_from_eth1(eth1_block_hash: Hash32,
 ### Epoch processing
 #### updated  `process_registry_updates`
 *Note*: changing the dequed validators to depend on the weight of activation up to the
-churn limit. Only the last 8 lines of the function are updated.
+churn limit. 
 ```python
 def process_registry_updates(state: BeaconState) -> None:
     # Process activation eligibility and ejections
@@ -310,20 +313,26 @@ def process_registry_updates(state: BeaconState) -> None:
         if is_eligible_for_activation(state, validator)
         # Order by the sequence of activation_eligibility_epoch setting and then index
     ], key=lambda index: (state.validators[index].activation_eligibility_epoch, index))
-    # ---- BELOW IS UPDATED ----
     # Dequeue validators for activation up to churn limit [MODIFIED TO BE WEIGHT-SENSITIVE]
-    max_churn_left = get_validator_churn_limit(state) # This is now a Gwei amount
+    
+    # --- MODIFIED --- #
+    activation_balance_to_consume = get_validator_churn_limit(state)
     for index in activation_queue:
         validator = state.validators[index]
-        max_churn_left -= validator.effective_balance
-        if max_churn_left < 0:
+        # Validator can now be activated
+        if state.activation_validator_balance + activation_balance_to_consume >= validator.effective_balance:
+            activation_balance_to_consume -= (validator.effective_balance - state.activation_validator_balance)
+            state.activation_validator_balance = Gwei(0)
+            validator.activation_epoch = compute_activation_exit_epoch(get_current_epoch(state))
+        else:  
+            state.activation_validator_balance += activation_balance_to_consume
             break
-        validator.activation_epoch = compute_activation_exit_epoch(get_current_epoch(state))
+    # --- END MODIFIED --- #
 ```
 
 ### Block processing
 ####  updated  `get_expected_withdrawals`
-*Note*: in the elif we now determine the ceiling of the partial withdrawal.
+*Note*: now calls `get_validator_excess_balance.`.
 ```python
 def get_expected_withdrawals(state: BeaconState) -> Sequence[Withdrawal]:
     epoch = get_current_epoch(state)
@@ -343,19 +352,56 @@ def get_expected_withdrawals(state: BeaconState) -> Sequence[Withdrawal]:
             ))
             withdrawal_index += WithdrawalIndex(1)
         elif is_partially_withdrawable_validator(validator, balance):
-            if has_eth1_withdrawal_credential(validator):            # added
-                ceiling = MIN_ACTIVATION_BALANCE                     # added
-            elif has_compounding_withdrawal_credential(validator):   # added
-                ceiling = MAX_EFFECTIVE_BALANCE                      # added
             withdrawals.append(Withdrawal(
                 index=withdrawal_index,
                 validator_index=validator_index,
                 address=ExecutionAddress(validator.withdrawal_credentials[12:]),
-                amount=balance - ceiling, # modified
+                # --- MODIFIED --- #
+                amount=get_validator_excess_balance(validator, balance),
+                # --- END MODIFIED --- #
             ))
             withdrawal_index += WithdrawalIndex(1)
         if len(withdrawals) == MAX_WITHDRAWALS_PER_PAYLOAD:
             break
         validator_index = ValidatorIndex((validator_index + 1) % len(state.validators))
     return withdrawals
+```
+
+#### Operations 
+
+##### Deposits
+
+**updated  `apply_deposit`**
+
+*Note*: updated to cap top-offs at 32 ETH to avoid skipping activation queue.
+
+```python
+def apply_deposit(state: BeaconState,
+                  pubkey: BLSPubkey,
+                  withdrawal_credentials: Bytes32,
+                  amount: uint64,
+                  signature: BLSSignature) -> None:
+    validator_pubkeys = [v.pubkey for v in state.validators]
+    if pubkey not in validator_pubkeys:
+        # Verify the deposit signature (proof of possession) which is not checked by the deposit contract
+        deposit_message = DepositMessage(
+            pubkey=pubkey,
+            withdrawal_credentials=withdrawal_credentials,
+            amount=amount,
+        )
+        domain = compute_domain(DOMAIN_DEPOSIT)  # Fork-agnostic domain since deposits are valid across forks
+        signing_root = compute_signing_root(deposit_message, domain)
+        if not bls.Verify(pubkey, signing_root, signature):
+            return
+
+        # Add validator and balance entries
+        state.validators.append(get_validator_from_deposit(pubkey, withdrawal_credentials, amount))
+        state.balances.append(amount)
+    else:
+
+        # --- MODIFIED --- #
+        # Increase balance by deposit amount, up to MIN_ACTIVATION_BALANCE
+        index = ValidatorIndex(validator_pubkeys.index(pubkey))
+        increase_balance(state, index, min(amount, MIN_ACTIVATION_BALANCE - state.balances[index]))
+        # --- END MODIFIED --- #
 ```
