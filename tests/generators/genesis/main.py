@@ -1,5 +1,5 @@
 from eth2spec.gen_helpers.gen_from_tests.gen import run_state_test_generators, combine_mods
-from eth2spec.test.helpers.constants import PHASE0, ALTAIR, BELLATRIX, CAPELLA, DENEB, EIP6110
+from eth2spec.test.helpers.constants import PHASE0, ALTAIR, BELLATRIX, CAPELLA, DENEB, EIP6110, MAXEB
 
 
 if __name__ == "__main__":

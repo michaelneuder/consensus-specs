@@ -436,6 +436,7 @@ with_bellatrix_and_later = with_all_phases_from(BELLATRIX)
 with_capella_and_later = with_all_phases_from(CAPELLA)
 with_deneb_and_later = with_all_phases_from(DENEB)
 with_eip6110_and_later = with_all_phases_from(EIP6110)
+with_maxeb_and_later = with_all_phases_from(MAXEB)
 
 
 def _get_preset_targets(kw):

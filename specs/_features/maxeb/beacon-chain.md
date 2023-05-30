@@ -43,7 +43,7 @@
 See [a modest proposal](https://notes.ethereum.org/@mikeneuder/increase-maxeb), the [diff view](https://github.com/michaelneuder/consensus-specs/pull/3/files) and 
 [security considerations](https://notes.ethereum.org/@fradamt/meb-increase-security).
 
-*Note:* This specification is built upon [Capella](../../capella/beacon-chain.md).
+*Note:* This specification is built upon [Deneb](../../deneb/beacon-chain.md).
 
 ## Constants
 
@@ -62,7 +62,7 @@ The following values are (non-configurable) constants used throughout the specif
 | Name | Value |
 | - | - |
 | new `MIN_ACTIVATION_BALANCE` | `Gwei(2**5 * 10**9)`  (32 ETH) |
-| updated `MAX_EFFECTIVE_BALANCE` | `Gwei(2**11 * 10**9)` (2048 ETH) |
+| updated `MAX_EFFECTIVE_BALANCE_MAXEB` | `Gwei(2**11 * 10**9)` (2048 ETH) |
 
 ## Containers
 
@@ -178,8 +178,8 @@ def get_validator_excess_balance(validator: Validator, balance: Gwei) -> Gwei:
     """
     Get excess balance for partial withdrawals for ``validator``.
     """
-    if has_compounding_withdrawal_credential(validator) and balance > MAX_EFFECTIVE_BALANCE:
-        return balance - MAX_EFFECTIVE_BALANCE
+    if has_compounding_withdrawal_credential(validator) and balance > MAX_EFFECTIVE_BALANCE_MAXEB:
+        return balance - MAX_EFFECTIVE_BALANCE_MAXEB
     elif has_eth1_withdrawal_credential(validator) and balance > MIN_ACTIVATION_BALANCE:
         return balance - MIN_ACTIVATION_BALANCE
     return Gwei(0)
@@ -204,10 +204,9 @@ def is_partially_withdrawable_validator(validator: Validator, balance: Gwei) -> 
 *Note*: updated to return a Gwei amount of amount of churn per epoch.
 
 ```python
-# --- MODIFIED --- #
 def get_validator_churn_limit(state: BeaconState) -> Gwei:
+    total_balance = get_total_active_balance(state)
     return max(MIN_PER_EPOCH_CHURN_LIMIT, total_balance // CHURN_LIMIT_QUOTIENT)
-# --- END MODIFIED --- #
 ```
 
 ### Beacon state mutators
@@ -278,14 +277,13 @@ def initialize_beacon_state_from_eth1(eth1_block_hash: Hash32,
     # Process activations
     for index, validator in enumerate(state.validators):
         balance = state.balances[index]
-        validator.effective_balance = min(balance - balance % EFFECTIVE_BALANCE_INCREMENT, MAX_EFFECTIVE_BALANCE)
+        validator.effective_balance = min(balance - balance % EFFECTIVE_BALANCE_INCREMENT, MAX_EFFECTIVE_BALANCE_MAXEB)
         
         # --- MODIFIED --- #
         if validator.effective_balance >= MIN_ACTIVATION_BALANCE: 
-        # --- END MODIFIED --- #
-        
             validator.activation_eligibility_epoch = GENESIS_EPOCH
             validator.activation_epoch = GENESIS_EPOCH
+        # --- END MODIFIED --- #
     # Set genesis validators root for domain separation and chain versioning
     state.genesis_validators_root = hash_tree_root(state.validators)
     return state

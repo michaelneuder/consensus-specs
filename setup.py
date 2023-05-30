@@ -684,13 +684,13 @@ from eth2spec.deneb import {preset_name} as deneb
 #
 # MAXEBSpecBuilder
 #
-class MAXEBSpecBuilder(CapellaSpecBuilder):
+class MAXEBSpecBuilder(DenebSpecBuilder):
     fork: str = MAXEB
 
     @classmethod
     def imports(cls, preset_name: str):
         return super().imports(preset_name) + f'''
-from eth2spec.capella import {preset_name} as capella
+from eth2spec.deneb import {preset_name} as deneb
 '''
 
 
