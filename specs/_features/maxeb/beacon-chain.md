@@ -61,8 +61,8 @@ The following values are (non-configurable) constants used throughout the specif
 
 | Name | Value |
 | - | - |
-| updated `MAX_EFFECTIVE_BALANCE` | `Gwei(2**11 * 10**9)` (2048 ETH) |
 | new `MIN_ACTIVATION_BALANCE` | `Gwei(2**5 * 10**9)`  (32 ETH) |
+| updated `MAX_EFFECTIVE_BALANCE` | `Gwei(2**11 * 10**9)` (2048 ETH) |
 
 ## Configuration
 
