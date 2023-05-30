@@ -1,10 +1,12 @@
 from .constants import (
     PHASE0, ALTAIR, BELLATRIX, CAPELLA, DENEB,
-    EIP6110,
+    EIP6110, MAXEB
 )
 
 
 def is_post_fork(a, b):
+    if a == MAXEB:
+        return b in [PHASE0, ALTAIR, BELLATRIX, CAPELLA, DENEB, MAXEB]
     if a == EIP6110:
         return b in [PHASE0, ALTAIR, BELLATRIX, CAPELLA, DENEB, EIP6110]
     if a == DENEB:
@@ -38,3 +40,7 @@ def is_post_deneb(spec):
 
 def is_post_eip6110(spec):
     return is_post_fork(spec.fork, EIP6110)
+
+
+def is_post_maxeb(spec):
+    return is_post_fork(spec.fork, MAXEB)

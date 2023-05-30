@@ -111,7 +111,7 @@ install_test:
 # Testing against `minimal` or `mainnet` config by default
 test: pyspec
 	. venv/bin/activate; cd $(PY_SPEC_DIR); \
-	python3 -m pytest -n 4 --fork=MAXEB --disable-bls $(COVERAGE_SCOPE) --cov-report="html:$(COV_HTML_OUT)" --cov-branch eth2spec
+	python3 -m pytest -n 4 --disable-bls $(COVERAGE_SCOPE) --cov-report="html:$(COV_HTML_OUT)" --cov-branch eth2spec
 
 # Testing against `minimal` or `mainnet` config by default
 find_test: pyspec
