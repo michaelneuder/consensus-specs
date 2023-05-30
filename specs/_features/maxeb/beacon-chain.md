@@ -1,4 +1,4 @@
-# [DRAFT] `MAX_EFFECTIVE_BALANCE` increase - Spec
+# MAXEB - Spec
 
 ## Table of contents
 
