@@ -95,12 +95,6 @@ class BeaconState(Container):
     # Registry
     validators: List[Validator, VALIDATOR_REGISTRY_LIMIT]
     balances: List[Gwei, VALIDATOR_REGISTRY_LIMIT]
-
-    # --- NEW --- #
-    activation_validator_balance: Gwei
-    exit_queue_churn: Gwei 
-    # --- END NEW --- #
-
     # Randomness
     randao_mixes: Vector[Bytes32, EPOCHS_PER_HISTORICAL_VECTOR]
     # Slashings
@@ -120,6 +114,14 @@ class BeaconState(Container):
     next_sync_committee: SyncCommittee
     # Execution
     latest_execution_payload_header: ExecutionPayloadHeader
+    # Withdrawals
+    next_withdrawal_index: WithdrawalIndex
+    next_withdrawal_validator_index: ValidatorIndex
+    # Deep history valid from Capella onwards
+    historical_summaries: List[HistoricalSummary, HISTORICAL_ROOTS_LIMIT]
+    # --- NEW --- #
+    activation_validator_balance: Gwei
+    exit_queue_churn: Gwei 
 ```
 
 ## Helpers
@@ -205,8 +207,7 @@ def is_partially_withdrawable_validator(validator: Validator, balance: Gwei) -> 
 
 ```python
 def get_validator_churn_limit(state: BeaconState) -> Gwei:
-    total_balance = get_total_active_balance(state)
-    return max(MIN_PER_EPOCH_CHURN_LIMIT, total_balance // CHURN_LIMIT_QUOTIENT)
+    return max(MIN_PER_EPOCH_CHURN_LIMIT * MIN_ACTIVATION_BALANCE, get_total_active_balance(state) // CHURN_LIMIT_QUOTIENT)
 ```
 
 ### Beacon state mutators
