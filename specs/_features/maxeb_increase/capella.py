@@ -183,6 +183,8 @@ SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY = 128
 DOMAIN_BLS_TO_EXECUTION_CHANGE = DomainType('0x0A000000')
 SLASHED_ATTESTER_FLAG_INDEX = 0
 SLASHED_PROPOSER_FLAG_INDEX = 1
+DOMAIN_CONSOLIDATION = DomainType('0x0B000000')
+UNSET_CONSOLIDATED_TO = Epoch(2**64 - 1)
 
 # Preset vars
 MAX_COMMITTEES_PER_SLOT = uint64(64)
@@ -321,6 +323,9 @@ class Validator(Container):
     activation_epoch: Epoch
     exit_epoch: Epoch
     withdrawable_epoch: Epoch  # When validator can withdraw funds
+    # TODO: may compress as; consolidated effective balance increments << 32 || consolidated to index
+    consolidated_to: ValidatorIndex
+    consolidated_balance: Gwei
 
 
 class AttestationData(Container):
@@ -619,6 +624,13 @@ class BLSToExecutionChange(Container):
 class SignedBLSToExecutionChange(Container):
     message: BLSToExecutionChange
     signature: BLSSignature
+
+
+class Consolidation(Container):
+    source_index: ValidatorIndex
+    target_index: ValidatorIndex
+    target_signature: BLSSignature
+    source_address: ExecutionAddress
 
 
 class BeaconBlockBody(Container):
@@ -1203,9 +1215,11 @@ def slash_validator(state: BeaconState,
     """
     Slash the validator with index ``slashed_index``.
     """
+    validator = state.validators[slashed_index]
+    if is_consolidated(validator):
+        unconsolidate_validator(state, slashed_index)
     epoch = get_current_epoch(state)
     initiate_validator_exit(state, slashed_index)
-    validator = state.validators[slashed_index]
     validator.slashed = add_flag(validator.slashed, SLASHED_ATTESTER_FLAG_INDEX)
     validator.withdrawable_epoch = max(validator.withdrawable_epoch, Epoch(epoch + EPOCHS_PER_SLASHINGS_VECTOR))
     state.slashings[epoch % EPOCHS_PER_SLASHINGS_VECTOR] += validator.effective_balance
@@ -1774,6 +1788,49 @@ def process_execution_layer_withdraw_request(
         amount=available_balance,
         withdrawable_epoch=withdrawable_epoch,
     ))
+
+
+def is_consolidated(validator: Validator) -> bool:
+   validator.consolidated_to != UNSET_CONSOLIDATED_TO
+
+
+def process_consolidation(state: BeaconState, consolidation: Consolidation) -> None:
+    target_validator = state[consolidation.target_index]
+    source_validator = state[consolidation.source_index]
+
+    assert is_active_validator(target_validator) and not target_validator.slashed and not is_consolidated(target_validator)
+    assert not source_validator.slashed and not is_consolidated(source_validator)
+
+    # verify source withdrawal credentials, which have authority over validating keys
+    assert source_validator.withdrawal_credentials[:1] == ETH1_ADDRESS_WITHDRAWAL_PREFIX
+    assert source_validator.withdrawal_credentials[12:] == consolidation.source_address
+
+    # target validator accepts consolidation operation onto itself
+    # Fork-agnostic domain since address changes are valid across forks
+    domain = compute_domain(DOMAIN_CONSOLIDATION, genesis_validators_root=state.genesis_validators_root)
+    signing_root = compute_signing_root(source_validator.pubkey, domain)
+    assert bls.Verify(target_validator.pubkey, signing_root, consolidation.target_signature)
+
+    consolidated_balance = state.balances[consolidation.source_index]
+    state.balances[consolidation.target_index] += consolidated_balance
+    state.balances[consolidation.source_index] = 0
+
+    source_validator.consolidated_to = consolidation.target_index
+    source_validator.consolidated_balance = consolidated_balance
+    # Balance is not exiting the active set, do not apply churn
+    source_validator.exit_epoch = get_current_epoch(state)
+    source_validator.withdrawable_epoch = Epoch(source_validator.exit_epoch + config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY)
+
+
+def unconsolidate_validator(state: BeaconState, validator_index: ValidatorIndex):
+    validator = state[validator_index]
+    state.balances[validator.consolidated_to] -= validator.consolidated_balance  # TODO: handle underflow
+    state.balances[validator_index] += validator.consolidated_balance
+    validator.consolidated_to = UNSET_CONSOLIDATED_TO
+    validator.consolidated_balance = 0
+    # Balance will exit the active set, reset exit_epoch to apply churn
+    validator.exit_epoch = FAR_FUTURE_EPOCH
+    validator.withdrawable_epoch = FAR_FUTURE_EPOCH
 
 
 def process_proposer_slashing(state: BeaconState, proposer_slashing: ProposerSlashing) -> None:
