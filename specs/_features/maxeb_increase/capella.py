@@ -1805,7 +1805,7 @@ def process_consolidation(state: BeaconState, consolidation: Consolidation) -> N
     source_validator = state[consolidation.source_index]
 
     assert target_validator.exit_epoch == FAR_FUTURE_EPOCH
-    assert not source_validator.slashed and not is_consolidated(source_validator)
+    assert source_validator.exit_epoch == FAR_FUTURE_EPOCH
 
     # verify source withdrawal credentials, which have authority over validating keys
     assert source_validator.withdrawal_credentials[:1] == ETH1_ADDRESS_WITHDRAWAL_PREFIX
