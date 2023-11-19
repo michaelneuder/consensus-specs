@@ -1817,8 +1817,13 @@ def process_consolidation(state: BeaconState, consolidation: Consolidation) -> N
     signing_root = compute_signing_root(source_validator.pubkey, domain)
     assert bls.Verify(target_validator.pubkey, signing_root, consolidation.target_signature)
 
-    state.balances[consolidation.target_index] += state.balances[consolidation.source_index]
+    active_balance = min(state.balances[consolidation.source_index], get_max_effective_balance(source_validator))
+    excess_balance = state.balances[consolidation.source_index] - active_balance
+    state.balances[consolidation.target_index] += active_balance
     state.balances[consolidation.source_index] = 0
+
+    # Excess balance above current active balance ceil, send to inbound churn
+    state.pending_balance_deposits.append(PendingBalanceDeposit(consolidation.target_index, excess_balance))
 
     source_validator.consolidated_to = consolidation.target_index
     # Balance is not exiting the active set, do not apply churn
@@ -3717,6 +3722,14 @@ def is_fully_withdrawable_validator(validator: Validator, balance: Gwei, epoch: 
         and validator.withdrawable_epoch <= epoch
         and balance > 0
     )
+
+
+def get_max_effective_balance(validator: Validator) -> Gwei:
+    if (has_compounding_withdrawal_credential(validator):
+        return MAX_EFFECTIVE_BALANCE
+    else:
+        return MIN_ACTIVATION_BALANCE
+
 
 def get_validator_excess_balance(validator: Validator, balance: Gwei) -> Gwei:
     """
