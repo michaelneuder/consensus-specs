@@ -307,6 +307,7 @@ MAX_WITHDRAWALS_PER_PAYLOAD = uint64(16)
 MAX_VALIDATORS_PER_WITHDRAWALS_SWEEP = 16384
 MAX_BLOBS_PER_BLOCK = uint64(4)
 FIELD_ELEMENTS_PER_BLOB = uint64(4096)
+MAX_TRANSACTIONS_PER_INCLUSION_LIST = 16
 
 
 class Configuration(NamedTuple):
@@ -563,6 +564,23 @@ class SyncAggregatorSelectionData(Container):
     subcommittee_index: uint64
 
 
+class InclusionListSummaryEntry(Container):
+    address: ExecutionAddress
+    gas_limit: uint64
+
+class InclusionListSummary(Container)
+    slot: Slot
+    proposer_index: ValidatorIndex
+    summary: List[InclusionListSummaryEntry, MAX_TRANSACTIONS_PER_INCLUSION_LIST]
+
+class SignedInclusionListSummary(Container):
+    message: InclusionListSummary
+    signature: BLSSignature
+
+class InclusionList(Container)
+    summary: SignedInclusionListSummary
+    transactions: List[Transaction, MAX_TRANSACTIONS_PER_INCLUSION_LIST]
+
 class ExecutionPayloadHeader(Container):
     # Execution block header fields
     parent_hash: Hash32
@@ -582,6 +600,7 @@ class ExecutionPayloadHeader(Container):
     transactions_root: Root
     withdrawals_root: Root
     excess_data_gas: uint256  # [New in Deneb]
+    inclusion_list_summary_root: Root
 
 
 class LightClientHeader(Container):
@@ -668,6 +687,8 @@ class ExecutionPayload(Container):
     transactions: List[Transaction, MAX_TRANSACTIONS_PER_PAYLOAD]
     withdrawals: List[Withdrawal, MAX_WITHDRAWALS_PER_PAYLOAD]
     excess_data_gas: uint256  # [New in Deneb]
+    inclusion_list_summary: List[InclusionListSummaryEntry, MAX_TRANSACTIONS_PER_INCLUSION_LIST]
+
 
 
 class BLSToExecutionChange(Container):
@@ -696,6 +717,8 @@ class BeaconBlockBody(Container):
     execution_payload: ExecutionPayload  # [Modified in Deneb]
     bls_to_execution_changes: List[SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES]
     blob_kzg_commitments: List[KZGCommitment, MAX_BLOBS_PER_BLOCK]  # [New in Deneb]
+    inclusion_list_summary: SignedInclusionListSummary
+
 
 
 class BeaconBlock(Container):
@@ -3448,6 +3471,7 @@ def process_execution_payload(state: BeaconState, payload: ExecutionPayload, exe
     # Verify timestamp
     assert payload.timestamp == compute_timestamp_at_slot(state, state.slot)
     # Verify the execution payload is valid
+    # UPDATED to check if the inclusion list is satisfied.
     assert execution_engine.notify_new_payload(payload)
 
     # Cache execution payload header
