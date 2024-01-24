@@ -138,8 +138,11 @@ def create_genesis_state(spec, validator_balances, activation_threshold):
         state.deposit_receipts_start_index = spec.UNSET_DEPOSIT_RECEIPTS_START_INDEX
     
     if is_post_maxeb(spec):
-        state.activation_validator_balance = 0
-        state.exit_queue_churn = 0
+        state.deposit_balance_to_consume = 0
+        state.exit_balance_to_consume = 0
+        state.earliest_exit_epoch = spec.GENESIS_EPOCH
+        state.pending_balance_deposits = []
+        state.pending_partial_withdrawals = []
 
     if is_post_whisk(spec):
         vc = len(state.validators)

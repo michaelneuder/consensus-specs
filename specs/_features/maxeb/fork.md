@@ -93,9 +93,6 @@ def upgrade_to_maxeb(pre: deneb.BeaconState) -> BeaconState:
         # Registry
         validators=pre.validators,
         balances=pre.balances,
-        # new MAXEB and set to default values.
-        activation_validator_balance=0,
-        exit_queue_churn=0,
         # Randomness
         randao_mixes=pre.randao_mixes,
         # Slashings
@@ -120,6 +117,12 @@ def upgrade_to_maxeb(pre: deneb.BeaconState) -> BeaconState:
         next_withdrawal_validator_index=pre.next_withdrawal_validator_index,
         # Deep history valid from Capella onwards
         historical_summaries=pre.historical_summaries,
+            # --- NEW in MaxEB--- #
+        deposit_balance_to_consume = 0,
+        exit_balance_to_consume = get_validator_churn_limit(pre),
+        earliest_exit_epoch = max([v.exit_epoch for v in pre.validators if v.exit_epoch != FAR_FUTURE_EPOCH]) + 1,
+        pending_balance_deposits = [],
+        pending_partial_withdrawals = [],
     )
     return post
 ```
