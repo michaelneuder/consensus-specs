@@ -511,11 +511,11 @@ def apply_deposit(state: BeaconState,
             state.previous_epoch_participation.append(ParticipationFlags(0b0000_0000))
             state.current_epoch_participation.append(ParticipationFlags(0b0000_0000))
             state.inactivity_scores.append(uint64(0))
-            index = get_index_for_new_validator(state)
-            state.pending_balance_deposits.append(PendingBalanceDeposit(index, amount))
+            index = len(state.validators) - 1
+            state.pending_balance_deposits.append(PendingBalanceDeposit(index=index, amount=amount))
     else:
         index = ValidatorIndex(validator_pubkeys.index(pubkey))
-        state.pending_balance_deposits.append(PendingBalanceDeposit(index, amount))
+        state.pending_balance_deposits.append(PendingBalanceDeposit(index=index, amount=amount))
 ```
 
 #### updated `get_validator_from_deposit`

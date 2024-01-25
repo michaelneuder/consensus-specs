@@ -390,3 +390,62 @@ def run_deposit_receipt_processing_with_specific_fork_version(
         valid=valid,
         effective=effective
     )
+
+
+#  ********************
+#  *      MAXEB       *
+#  ********************
+    
+
+def run_deposit_processing_maxeb(spec, state, deposit, validator_index, valid=True, effective=True):
+    """
+    Run ``process_deposit``, yielding:
+      - pre-state ('pre')
+      - deposit ('deposit')
+      - post-state ('post').
+    If ``valid == False``, run expecting ``AssertionError``
+    """
+    pre_validator_count = len(state.validators)
+    pre_pending_deposits = len(state.pending_balance_deposits)
+    pre_balance = 0
+    pre_effective_balance = 0
+    is_top_up = False
+    # is a top-up
+    if validator_index < pre_validator_count:
+        is_top_up = True
+        pre_balance = get_balance(state, validator_index) 
+        pre_effective_balance = state.validators[validator_index].effective_balance
+
+    print(state.pending_balance_deposits)
+    yield 'pre', state
+    yield 'deposit', deposit
+
+    if not valid:
+        expect_assertion_error(lambda: spec.process_deposit(state, deposit))
+        yield 'post', None
+        return
+
+    spec.process_deposit(state, deposit)
+
+    yield 'post', state
+
+    # no balance changes on deposit processing
+    assert get_balance(state, validator_index) == pre_balance
+    assert state.validators[validator_index].effective_balance == pre_effective_balance
+
+    if not effective or not bls.KeyValidate(deposit.data.pubkey):
+        assert len(state.validators) == pre_validator_count
+        assert len(state.balances) == pre_validator_count
+    else:
+        if is_top_up:
+            assert len(state.validators) == pre_validator_count
+            assert len(state.balances) == pre_validator_count
+        else:
+            # new validator
+            assert len(state.validators) == pre_validator_count + 1
+            assert len(state.balances) == pre_validator_count + 1
+        # new correct balance deposit has been appended
+        assert len(state.pending_balance_deposits) == pre_pending_deposits + 1
+        assert state.pending_balance_deposits[pre_pending_deposits].amount == deposit.data.amount
+        assert state.pending_balance_deposits[pre_pending_deposits].index == validator_index
+    assert state.eth1_deposit_index == state.eth1_data.deposit_count
