@@ -233,6 +233,7 @@ PROPORTIONAL_SLASHING_MULTIPLIER_BELLATRIX = uint64(3)
 MAX_BLS_TO_EXECUTION_CHANGES = 16
 MAX_WITHDRAWALS_PER_PAYLOAD = uint64(16)
 MAX_VALIDATORS_PER_WITHDRAWALS_SWEEP = 16384
+MIN_SLASHING_PENALTY_QUOTIENT_MAXEB = uint64(65536)
 DOMAIN_CONSOLIDATION = DomainType('0x0B000000')
 MAX_CONSOLIDATIONS = 1
 PENDING_CONSOLIDATIONS_LIMIT = uint64(262144)  # MAX_CONSOLIDATIONS * SLOTS_PER_EPOCH * 8192
@@ -1257,7 +1258,7 @@ def slash_validator(state: BeaconState,
     validator.slashed = True
     validator.withdrawable_epoch = max(validator.withdrawable_epoch, Epoch(epoch + EPOCHS_PER_SLASHINGS_VECTOR))
     state.slashings[epoch % EPOCHS_PER_SLASHINGS_VECTOR] += validator.effective_balance
-    slashing_penalty = validator.effective_balance // MIN_SLASHING_PENALTY_QUOTIENT_BELLATRIX  # [Modified in Bellatrix]
+    slashing_penalty = validator.effective_balance // MIN_SLASHING_PENALTY_QUOTIENT_MAXEB  # [Modified in MAXEB]
     decrease_balance(state, slashed_index, slashing_penalty)
 
     # Apply proposer and whistleblower rewards
