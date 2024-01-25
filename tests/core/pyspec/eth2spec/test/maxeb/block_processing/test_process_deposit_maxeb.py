@@ -2,7 +2,6 @@ from eth2spec.test.helpers.deposits import (
     build_deposit,
     prepare_state_and_deposit,
     run_deposit_processing_maxeb,
-    run_deposit_processing_with_specific_fork_version,
     sign_deposit_data,
 )
 from eth2spec.test.helpers.keys import privkeys, pubkeys

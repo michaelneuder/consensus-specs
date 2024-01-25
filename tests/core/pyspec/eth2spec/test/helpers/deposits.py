@@ -416,7 +416,6 @@ def run_deposit_processing_maxeb(spec, state, deposit, validator_index, valid=Tr
         pre_balance = get_balance(state, validator_index) 
         pre_effective_balance = state.validators[validator_index].effective_balance
 
-    print(state.pending_balance_deposits)
     yield 'pre', state
     yield 'deposit', deposit
 
@@ -449,3 +448,4 @@ def run_deposit_processing_maxeb(spec, state, deposit, validator_index, valid=Tr
         assert state.pending_balance_deposits[pre_pending_deposits].amount == deposit.data.amount
         assert state.pending_balance_deposits[pre_pending_deposits].index == validator_index
     assert state.eth1_deposit_index == state.eth1_data.deposit_count
+

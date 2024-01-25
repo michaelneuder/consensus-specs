@@ -70,6 +70,7 @@ def test_exit_queue_large_validator(spec, state):
 
     # Set 0th validator effective balance to 2048 ETH
     state.validators[0].effective_balance = spec.MAX_EFFECTIVE_BALANCE_MAXEB
+    yield 'pre', state
 
     expected_exit_epoch = spec.compute_activation_exit_epoch(spec.get_current_epoch(state))
     # Validator consumes exit churn for 16 epochs, exits at the 17th one
@@ -77,6 +78,7 @@ def test_exit_queue_large_validator(spec, state):
 
     validator_index = 0
     spec.initiate_validator_exit(state, validator_index)
+    yield 'post', state
     # Check exit epoch
     assert state.validators[validator_index].exit_epoch == expected_exit_epoch
     # Check exit_balance_to_consume
@@ -94,10 +96,12 @@ def test_exit_queue_validator_with_churn_limit_balance(spec, state):
 
     # Set 0th validator effective balance to churn_limit
     state.validators[0].effective_balance = churn_limit
+    yield 'pre', state
 
     validator_index = 0
     spec.initiate_validator_exit(state, validator_index)
 
+    yield 'post', state
     # Validator consumes churn limit fully in the current epoch
     assert state.validators[validator_index].exit_epoch == spec.compute_activation_exit_epoch(spec.get_current_epoch(state))
     # Check exit_balance_to_consume
@@ -120,10 +124,12 @@ def test_exit_queue_large_validator_existing_churn(spec, state):
     # Set 0th validator effective balance to the churn limit
     state.validators[0].effective_balance = cl
 
+    yield 'pre', state
+
     # The existing 1 ETH churn will push an extra epoch
     expected_exit_epoch = state.earliest_exit_epoch + 1
 
-
+    yield 'post', state
     validator_index = 0
     spec.initiate_validator_exit(state, validator_index)
     # Check exit epoch
@@ -146,14 +152,17 @@ def test_exit_queue_large_validator_existing_churn_2epochs(spec, state):
     # consume some churn in exit epoch
     state.exit_balance_to_consume -= 1000000000
 
+
     # Set 0th validator effective balance to 2x the churn limit
     state.validators[0].effective_balance = 2*cl
 
+    yield 'pre', state
     # Two extra epochs will be necessary
     expected_exit_epoch = spec.compute_activation_exit_epoch(spec.get_current_epoch(state)) + 2
 
     validator_index = 0
     spec.initiate_validator_exit(state, validator_index)
+    yield 'post', state
     # Check exit epoch
     assert state.validators[validator_index].exit_epoch == expected_exit_epoch
     # Check balance consumed in exit epoch is the remainder 1 ETH
