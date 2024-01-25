@@ -114,7 +114,7 @@ def objects_to_spec(preset_name: str,
         return out
 
     # Merge all constant objects
-    hardcoded_ssz_dep_constants =         reduce(lambda obj, builder: {**obj, **builder.hardcoded_ssz_dep_constants()}, builders, {})
+    hardcoded_ssz_dep_constants = reduce(lambda obj, builder: {**obj, **builder.hardcoded_ssz_dep_constants()}, builders, {})
     hardcoded_custom_type_dep_constants = reduce(lambda obj, builder: {**obj, **builder.hardcoded_custom_type_dep_constants(spec_object)}, builders, {})
     hardcoded_func_dep_presets = reduce(lambda obj, builder: {**obj, **builder.hardcoded_func_dep_presets(spec_object)}, builders, {})
     # Concatenate all strings

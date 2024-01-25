@@ -511,6 +511,7 @@ with_eip6110_and_later = with_all_phases_from(EIP6110)
 with_eip7002_and_later = with_all_phases_from(EIP7002)
 with_whisk_and_later = with_all_phases_from(WHISK, all_phases=ALLOWED_TEST_RUNNER_FORKS)
 with_eip7594_and_later = with_all_phases_from(EIP7594, all_phases=ALLOWED_TEST_RUNNER_FORKS)
+with_maxeb_and_later = with_all_phases_from(MAXEB, all_phases=ALLOWED_TEST_RUNNER_FORKS)
 
 
 class quoted_str(str):

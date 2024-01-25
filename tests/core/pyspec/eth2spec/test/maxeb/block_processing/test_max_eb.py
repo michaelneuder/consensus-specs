@@ -1,6 +1,8 @@
+from eth2spec.test.helpers.constants import (MINIMAL, MAINNET)
 from eth2spec.test.context import (
     spec_state_test,
     with_maxeb_and_later,
+    with_presets
 )
 
 #  ********************
@@ -9,7 +11,7 @@ from eth2spec.test.context import (
 
 @with_maxeb_and_later
 @spec_state_test
-def test_exit_queue_churn_32eth_validators(spec, state):
+def test_exit_queue_32eth_validators(spec, state):
     # This state has 64 validators each with 32 ETH
     single_validator_balance = spec.MIN_ACTIVATION_BALANCE
     expected_exit_epoch = spec.compute_activation_exit_epoch(spec.get_current_epoch(state))
@@ -40,9 +42,29 @@ def test_exit_queue_churn_32eth_validators(spec, state):
     assert state.exit_balance_to_consume == churn_limit - single_validator_balance
 
 
+
+# @with_maxeb_and_later
+# @spec_state_test
+# def test_exit_balance_to_consume_large_validator(spec, state):
+#     # Set 0th validator effective balance to 2048 ETH
+#     state.validators[0].effective_balance = spec.MAX_EFFECTIVE_BALANCE_MAXEB 
+#     churn_limit = spec.get_validator_churn_limit(state)
+#     expected_exit_epoch = spec.compute_activation_exit_epoch(spec.get_current_epoch(state))
+#     expected_exit_epoch += spec.MAX_EFFECTIVE_BALANCE_MAXEB // churn_limit
+
+#     validator_index = 0
+#     spec.initiate_validator_exit(state, validator_index)
+#     # Check exit epoch
+#     assert state.validators[validator_index].exit_epoch == expected_exit_epoch
+#     # Check exit_balance_to_consume
+#     assert state.exit_balance_to_consume == churn_limit - (spec.MAX_EFFECTIVE_BALANCE_MAXEB % churn_limit)
+#     # Check earliest_exit_epoch
+#     assert state.earliest_exit_epoch == expected_exit_epoch
+
 @with_maxeb_and_later
 @spec_state_test
-def test_exit_queue_churn_large_validator(spec, state):
+@with_presets([MAINNET], "With CHURN_LIMIT_QUOTIENT=32, can't change validator balance without changing churn_limit")
+def test_exit_queue_large_validator(spec, state):
     churn_limit = spec.get_validator_churn_limit(state)
     assert churn_limit == spec.MIN_ACTIVATION_BALANCE * spec.config.MIN_PER_EPOCH_CHURN_LIMIT
 
@@ -58,14 +80,15 @@ def test_exit_queue_churn_large_validator(spec, state):
     # Check exit epoch
     assert state.validators[validator_index].exit_epoch == expected_exit_epoch
     # Check exit_balance_to_consume
-    print(expected_exit_epoch)
-    assert state.exit_balance_to_consume == 0
+    assert state.exit_balance_to_consume == churn_limit
     # Check earliest_exit_epoch
     assert state.earliest_exit_epoch == expected_exit_epoch
 
+
 @with_maxeb_and_later
 @spec_state_test
-def test_exit_queue_churn_churn_limit_validator(spec, state):
+@with_presets([MAINNET], "With CHURN_LIMIT_QUOTIENT=32, can't change validator balance without changing churn_limit")
+def test_exit_queue_validator_with_churn_limit_balance(spec, state):
     churn_limit = spec.get_validator_churn_limit(state)
     assert churn_limit == spec.MIN_ACTIVATION_BALANCE * spec.config.MIN_PER_EPOCH_CHURN_LIMIT
 
@@ -82,54 +105,61 @@ def test_exit_queue_churn_churn_limit_validator(spec, state):
     # Check earliest_exit_epoch
     assert state.earliest_exit_epoch == state.validators[validator_index].exit_epoch
 
+@with_maxeb_and_later
+@spec_state_test
+@with_presets([MAINNET], "With CHURN_LIMIT_QUOTIENT=32, can't change validator balance without changing churn_limit")
+def test_exit_queue_large_validator_existing_churn(spec, state):
+    cl = spec.get_validator_churn_limit(state)
+    
+    # set exit epoch to the first available one and set exit balance to consume to full churn limit
+    state.earliest_exit_epoch = spec.compute_activation_exit_epoch(spec.get_current_epoch(state))
+    state.exit_balance_to_consume = cl
+    # consume some churn in exit epoch
+    state.exit_balance_to_consume -= 1000000000
+
+    # Set 0th validator effective balance to the churn limit
+    state.validators[0].effective_balance = cl
+
+    # The existing 1 ETH churn will push an extra epoch
+    expected_exit_epoch = state.earliest_exit_epoch + 1
 
 
-# @with_maxeb_and_later
-# @spec_state_test
-# def test_exit_queue_churn_large_validator_existing_churn(spec, state):
-#     cl = spec.get_validator_churn_limit(state)
-#     assert cl == spec.MIN_ACTIVATION_BALANCE * spec.config.MIN_PER_EPOCH_CHURN_LIMIT
-
-#     # Set the churn to 1 ETH
-#     state.exit_queue_churn = 1000000000
-
-#     # Set 0th validator effective balance to the churn limit
-#     state.validators[0].effective_balance = cl
-
-#     expected_exit_epoch = spec.compute_activation_exit_epoch(spec.get_current_epoch(state))
-#     # The existing 1 ETH churn will push an extra epoch
-#     expected_exit_epoch += 1
-
-#     validator_index = 0
-#     spec.initiate_validator_exit(state, validator_index)
-#     # Check exit epoch
-#     assert state.validators[validator_index].exit_epoch == expected_exit_epoch
-#     # Check exit queue churn is the remainder 1 ETH
-#     assert state.exit_queue_churn == 1000000000
+    validator_index = 0
+    spec.initiate_validator_exit(state, validator_index)
+    # Check exit epoch
+    assert state.validators[validator_index].exit_epoch == expected_exit_epoch
+    # Check balance consumed in exit epoch is the remainder 1 ETH
+    assert state.exit_balance_to_consume == cl - 1000000000
+    # check earliest exit epoch 
+    assert expected_exit_epoch == state.earliest_exit_epoch
 
 
-# @with_maxeb_and_later
-# @spec_state_test
-# def test_exit_queue_churn_large_validator_existing_churn_2epochs(spec, state):
-#     cl = spec.get_validator_churn_limit(state)
-#     assert cl == spec.MIN_ACTIVATION_BALANCE * spec.config.MIN_PER_EPOCH_CHURN_LIMIT
+@with_maxeb_and_later
+@spec_state_test
+def test_exit_queue_large_validator_existing_churn_2epochs(spec, state):
+    cl = spec.get_validator_churn_limit(state)
+    assert cl == spec.MIN_ACTIVATION_BALANCE * spec.config.MIN_PER_EPOCH_CHURN_LIMIT
 
-#     # Set the churn to 1 ETH.
-#     state.exit_queue_churn = 1000000000
+    # set exit epoch to the first available one and set exit balance to consume to full churn limit
+    state.earliest_exit_epoch = spec.compute_activation_exit_epoch(spec.get_current_epoch(state))
+    state.exit_balance_to_consume = cl
+    # consume some churn in exit epoch
+    state.exit_balance_to_consume -= 1000000000
 
-#     # Set 0th validator effective balance to the churn limit
-#     state.validators[0].effective_balance = 2*cl
+    # Set 0th validator effective balance to 2x the churn limit
+    state.validators[0].effective_balance = 2*cl
 
-#     expected_exit_epoch = spec.compute_activation_exit_epoch(spec.get_current_epoch(state))
-#     # Two extra epochs will be necessary
-#     expected_exit_epoch += 2
+    # Two extra epochs will be necessary
+    expected_exit_epoch = spec.compute_activation_exit_epoch(spec.get_current_epoch(state)) + 2
 
-#     validator_index = 0
-#     spec.initiate_validator_exit(state, validator_index)
-#     # Check exit epoch
-#     assert state.validators[validator_index].exit_epoch == expected_exit_epoch
-#     # Check exit queue churn is the remainder 1 ETH
-#     assert state.exit_queue_churn == 1000000000
+    validator_index = 0
+    spec.initiate_validator_exit(state, validator_index)
+    # Check exit epoch
+    assert state.validators[validator_index].exit_epoch == expected_exit_epoch
+    # Check balance consumed in exit epoch is the remainder 1 ETH
+    assert state.exit_balance_to_consume == cl - 1000000000
+    # check earliest exit epoch 
+    assert expected_exit_epoch == state.earliest_exit_epoch
     
 
 
@@ -155,9 +185,7 @@ def test_exit_queue_churn_churn_limit_validator(spec, state):
 #     for i in range(spec.config.MIN_PER_EPOCH_CHURN_LIMIT):
 #         # Check exit epoch
 #         assert state.validators[i].activation_epoch == expected_activation_epoch
-    
-#     # Check activation validator balance is 0
-#     assert state.activation_validator_balance == 0
+
 
 #     # Check that the next validator has not been dequeued
 #     assert state.validators[spec.config.MIN_PER_EPOCH_CHURN_LIMIT+1].activation_epoch == spec.FAR_FUTURE_EPOCH
