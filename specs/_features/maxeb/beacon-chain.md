@@ -90,7 +90,7 @@ class PartialWithdrawal(Container):
 class ExecutionLayerWithdrawRequest(Container):
     source_address: ExecutionAddress
     validator_pubkey: BLSPubkey
-    balance: Gwei
+    amount: Gwei
 ```
 
 ### Extended Containers
@@ -198,16 +198,16 @@ def is_fully_withdrawable_validator(validator: Validator, balance: Gwei, epoch: 
 ```
 
 ####  updated  `is_partially_withdrawable_validator`
-*Note*: now calls `has_withdrawalable_credential` and gets ceiling from `get_balance_ceiling`.
+*Note*: now calls `has_compounding_withdrawal_credential` and gets ceiling from `get_balance_ceiling`.
 
 ```python
 def is_partially_withdrawable_validator(validator: Validator, balance: Gwei) -> bool:
     """
     Check if ``validator`` is partially withdrawable.
     """
-    # --- MODIFIED --- #
+    if not (has_eth1_withdrawal_credential(validator) or has_compounding_withdrawal_credential(validator)):
+        return False
     return get_validator_excess_balance(validator, balance) > 0
-    # --- END MODIFIED --- #
 ```
 
 
@@ -410,19 +410,19 @@ def process_execution_layer_withdraw_request(
         return
 
     pending_balance_to_withdraw = sum(item.amount for item in state.pending_partial_withdrawals if item.index == validator_index)
-    # TODO: Should substract `MIN_ACTIVATION_BALANCE` or ejection balance?
-    available_balance = state.balances[validator_index] - MIN_ACTIVATION_BALANCE - pending_balance_to_withdraw
-    if available_balance < execution_layer_withdraw_request.balance:
-        return
-
-    exit_queue_epoch = compute_exit_epoch_and_update_churn(state, available_balance)
-    withdrawable_epoch = Epoch(exit_queue_epoch + MIN_VALIDATOR_WITHDRAWABILITY_DELAY)
-
-    state.pending_partial_withdrawals.append(PartialWithdrawal(
-        index=validator_index,
-        amount=available_balance,
-        withdrawable_epoch=withdrawable_epoch,
-    ))
+    amount = execution_layer_withdraw_request.amount
+    # amount = 0 indicates an exit, but only exit if there are no other pending withdrawals
+    if amount == 0 and pending_balance_to_withdraw == 0:
+        initiate_validator_exit(state, validator_index)
+    elif state.balances[validator_index] > MIN_ACTIVATION_BALANCE + pending_balance_to_withdraw:
+        to_withdraw = min(state.balances[validator_index] - MIN_ACTIVATION_BALANCE - pending_balance_to_withdraw, amount)
+        exit_queue_epoch = compute_exit_epoch_and_update_churn(state, to_withdraw)
+        withdrawable_epoch = Epoch(exit_queue_epoch + MIN_VALIDATOR_WITHDRAWABILITY_DELAY)
+        state.pending_partial_withdrawals.append(PartialWithdrawal(
+            index=validator_index,
+            amount=to_withdraw,
+            withdrawable_epoch=withdrawable_epoch,
+        ))
 ```
 
 ####  updated  `get_expected_withdrawals`
