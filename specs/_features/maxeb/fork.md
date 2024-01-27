@@ -121,6 +121,8 @@ def upgrade_to_maxeb(pre: deneb.BeaconState) -> BeaconState:
         deposit_balance_to_consume = 0,
         exit_balance_to_consume = get_activation_exit_churn_limit(pre),
         earliest_exit_epoch = max([v.exit_epoch for v in pre.validators if v.exit_epoch != FAR_FUTURE_EPOCH]) + 1,
+        consolidation_balance_to_consume = get_consolidation_churn_limit(pre),
+        earliest_consolidation_epoch = compute_activation_exit_epoch(get_current_epoch(state)),
         pending_balance_deposits = [],
         pending_partial_withdrawals = [],
         pending_consolidations = [],

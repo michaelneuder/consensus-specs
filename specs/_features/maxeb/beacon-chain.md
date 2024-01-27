@@ -207,6 +207,8 @@ class BeaconState(Container):
     deposit_balance_to_consume: Gwei
     exit_balance_to_consume: Gwei  # Initialized with get_activation_exit_churn_limit(state)
     earliest_exit_epoch: Epoch  # Initialized with the max([v.exit_epoch for v in state.validators if v.exit_epoch != FAR_FUTURE_EPOCH]) + 1
+    consolidation_balance_to_consume: Gwei
+    earliest_consolidation_epoch: Epoch
     pending_balance_deposits: List[PendingBalanceDeposit, 100000]
     pending_partial_withdrawals: List[PartialWithdrawal, 100000]
     pending_consolidations: List[PendingConsolidation, PENDING_CONSOLIDATIONS_LIMIT]
