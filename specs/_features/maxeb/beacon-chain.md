@@ -64,6 +64,14 @@ The following values are (non-configurable) constants used throughout the specif
 | `MIN_ACTIVATION_BALANCE` | `Gwei(2**5 * 10**9)`  (32 ETH) |
 | `MAX_EFFECTIVE_BALANCE_MAXEB` | `Gwei(2**11 * 10**9)` (2048 ETH) |
 
+### Rewards and penalties
+
+| Name | Value |
+| - | - |
+| `MIN_SLASHING_PENALTY_QUOTIENT_MAXEB` | `Gwei(2**16)`  (65536) |
+
+
+
 ## Containers
 
 ### New containers
@@ -286,6 +294,27 @@ def compute_exit_epoch_and_update_churn(state: BeaconState, exit_balance: Gwei) 
         state.exit_balance_to_consume = per_epoch_churn - remainder
     return state.earliest_exit_epoch
 ```
+
+#### updated `slash_validator`
+
+```python
+def slash_validator(state: BeaconState,
+                    slashed_index: ValidatorIndex,
+                    whistleblower_index: ValidatorIndex=None) -> None:
+    """
+    Slash the validator with index ``slashed_index``.
+    """
+    epoch = get_current_epoch(state)
+    initiate_validator_exit(state, slashed_index)
+    validator = state.validators[slashed_index]
+    validator.slashed = True
+    validator.withdrawable_epoch = max(validator.withdrawable_epoch, Epoch(epoch + EPOCHS_PER_SLASHINGS_VECTOR))
+fradamt marked this conversation as resolved.
+    state.slashings[epoch % EPOCHS_PER_SLASHINGS_VECTOR] += validator.effective_balance
+    slashing_penalty = validator.effective_balance // MIN_SLASHING_PENALTY_QUOTIENT_MAXEB  # [Modified in MAXEB]
+    decrease_balance(state, slashed_index, slashing_penalty)
+```
+
 
 ## Beacon chain state transition function
 ### Epoch processing
