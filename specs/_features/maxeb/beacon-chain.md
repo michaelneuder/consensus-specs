@@ -205,7 +205,7 @@ class BeaconState(Container):
     historical_summaries: List[HistoricalSummary, HISTORICAL_ROOTS_LIMIT]
     # --- New --- #
     deposit_balance_to_consume: Gwei
-    exit_balance_to_consume: Gwei  # Initialized with get_validator_churn_limit(state)
+    exit_balance_to_consume: Gwei  # Initialized with get_activation_exit_churn_limit(state)
     earliest_exit_epoch: Epoch  # Initialized with the max([v.exit_epoch for v in state.validators if v.exit_epoch != FAR_FUTURE_EPOCH]) + 1
     pending_balance_deposits: List[PendingBalanceDeposit, 100000]
     pending_partial_withdrawals: List[PartialWithdrawal, 100000]
@@ -313,7 +313,7 @@ def get_validator_excess_balance(validator: Validator, balance: Gwei) -> Gwei:
     return Gwei(0)
 ```
 
-#### Updated  `get_validator_churn_limit`
+#### New  `get_churn_limit`
 
 *Note*: Updated to return a Gwei amount of amount of churn per epoch.
 
@@ -375,7 +375,7 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
 ```python
 def compute_exit_epoch_and_update_churn(state: BeaconState, exit_balance: Gwei) -> Epoch:
     earliest_exit_epoch = compute_activation_exit_epoch(get_current_epoch(state))
-    per_epoch_churn = get_validator_churn_limit(state)
+    per_epoch_churn = get_activation_exit_churn_limit(state)
     # New epoch for exits.
     if state.earliest_exit_epoch < earliest_exit_epoch:
         state.earliest_exit_epoch = earliest_exit_epoch
@@ -479,7 +479,7 @@ def process_registry_updates(state: BeaconState) -> None:
 
 ```python
 def process_pending_balance_deposits(state: BeaconState) -> None:
-    state.deposit_balance_to_consume += get_validator_churn_limit(state)
+    state.deposit_balance_to_consume += get_activation_exit_churn_limit(state)
     next_pending_deposit_index = 0
     for pending_balance_deposit in state.pending_balance_deposits:
         if state.deposit_balance_to_consume < pending_balance_deposit.amount:
