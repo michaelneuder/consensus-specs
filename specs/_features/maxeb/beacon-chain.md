@@ -16,22 +16,22 @@
     - [`BeaconState`](#beaconstate)
 - [Helpers](#helpers)
   - [Predicates](#predicates)
-    - [updated `is_eligible_for_activation_queue`](#updated-is_eligible_for_activation_queue)
-    - [new `has_compounding_withdrawal_credential`](#new-has_compounding_withdrawal_credential)
-    - [updated  `is_fully_withdrawable_validator`](#updated--is_fully_withdrawable_validator)
-    - [new `get_validator_excess_balance`](#new-get_validator_excess_balance)
-    - [updated  `is_partially_withdrawable_validator`](#updated--is_partially_withdrawable_validator)
+    - [Updated `is_eligible_for_activation_queue`](#updated-is_eligible_for_activation_queue)
+    - [New `has_compounding_withdrawal_credential`](#new-has_compounding_withdrawal_credential)
+    - [Updated  `is_fully_withdrawable_validator`](#updated--is_fully_withdrawable_validator)
+    - [New `get_validator_excess_balance`](#new-get_validator_excess_balance)
+    - [Updated  `is_partially_withdrawable_validator`](#updated--is_partially_withdrawable_validator)
   - [Beacon state accessors](#beacon-state-accessors)
-    - [updated  `get_validator_churn_limit`](#updated--get_validator_churn_limit)
+    - [Updated  `get_validator_churn_limit`](#updated--get_validator_churn_limit)
   - [Beacon state mutators](#beacon-state-mutators)
-    - [updated  `initiate_validator_exit`](#updated--initiate_validator_exit)
+    - [Updated  `initiate_validator_exit`](#updated--initiate_validator_exit)
 - [Genesis](#genesis)
-    - [updated  `initialize_beacon_state_from_eth1`](#updated--initialize_beacon_state_from_eth1)
+    - [Updated  `initialize_beacon_state_from_eth1`](#updated--initialize_beacon_state_from_eth1)
 - [Beacon chain state transition function](#beacon-chain-state-transition-function)
   - [Epoch processing](#epoch-processing)
-    - [updated  `process_registry_updates`](#updated--process_registry_updates)
+    - [Updated  `process_registry_updates`](#updated--process_registry_updates)
   - [Block processing](#block-processing)
-    - [updated  `get_expected_withdrawals`](#updated--get_expected_withdrawals)
+    - [Updated  `get_expected_withdrawals`](#updated--get_expected_withdrawals)
     - [Operations](#operations)
       - [Deposits](#deposits)
 
@@ -57,26 +57,54 @@ The following values are (non-configurable) constants used throughout the specif
 | `ETH1_ADDRESS_WITHDRAWAL_PREFIX` | `Bytes1('0x01')` |
 | `COMPOUNDING_WITHDRAWAL_PREFIX` | `Bytes1('0x02')` |
 
+### Domains
+
+| Name | Value |
+| - | - |
+| `DOMAIN_CONSOLIDATION` | `DomainType('0x0B000000')` |
+
+## Presets
+
 ### Gwei values
 
 | Name | Value |
 | - | - |
-| `MIN_ACTIVATION_BALANCE` | `Gwei(2**5 * 10**9)`  (32 ETH) |
-| `MAX_EFFECTIVE_BALANCE_MAXEB` | `Gwei(2**11 * 10**9)` (2048 ETH) |
+| `MIN_ACTIVATION_BALANCE` | `Gwei(2**5 * 10**9)`  (= 32,000,000,000) |
+| `MAX_EFFECTIVE_BALANCE_MAXEB` | `Gwei(2**11 * 10**9)` (= 2048,000,000,000) |
 
 ### Rewards and penalties
 
 | Name | Value |
 | - | - |
-| `MIN_SLASHING_PENALTY_QUOTIENT_MAXEB` | `Gwei(2**16)`  (65536) |
+| `MIN_SLASHING_PENALTY_QUOTIENT_MAXEB` | `Gwei(2**16)`  (= 65,536) |
 
+### Max operations per block
+
+| Name | Value |
+| - | - |
+| `MAX_CONSOLIDATIONS` | `uint64(1)` |
+
+### State list lengths
+
+| Name | Value | Unit | Duration |
+| - | - | :-: | :-: |
+| `PENDING_CONSOLIDATIONS_LIMIT` | `uint64(2**18)` (= 262,144) | pending consolidations |  |
+
+## Configuration
+
+### Validator cycle
+
+| Name | Value |
+| - | - |
+| `MIN_PER_EPOCH_CHURN_LIMIT_MAXEB` | `Gwei(2**7 * 10**9)` (= 128,000,000,000) | # Equivalent to 4 32 ETH validators
+| `MAX_PER_EPOCH_ACTIVATION_EXIT_CHURN_LIMIT` | `Gwei(2**8 * 10**9)` (256,000,000,000) |
 
 
 ## Containers
 
 ### New containers
 
-#### new `PendingBalanceDeposit`
+#### New `PendingBalanceDeposit`
 
 ```python
 class PendingBalanceDeposit(Container):
@@ -84,7 +112,7 @@ class PendingBalanceDeposit(Container):
     amount: Gwei
 ```
 
-#### new `PartialWithdrawal`
+#### New `PartialWithdrawal`
 
 ```python
 class PartialWithdrawal(Container):
@@ -92,7 +120,7 @@ class PartialWithdrawal(Container):
     amount: Gwei
     withdrawable_epoch: Epoch
 ```
-#### new `ExecutionLayerWithdrawRequest`
+#### New `ExecutionLayerWithdrawRequest`
 
 ```python
 class ExecutionLayerWithdrawRequest(Container):
@@ -100,6 +128,33 @@ class ExecutionLayerWithdrawRequest(Container):
     validator_pubkey: BLSPubkey
     amount: Gwei
 ```
+
+#### New `Consolidation`
+
+```python
+class Consolidation(Container):
+    source_index: ValidatorIndex
+    target_index: ValidatorIndex
+    epoch: Epoch
+```
+
+#### New `SignedConsolidation`
+```python
+class SignedConsolidation(Container):
+    message: Consolidation
+    signature: BLSSignature
+```
+
+#### New `PendingConsolidation`
+```python
+class PendingConsolidation(Container):
+    source_index: ValidatorIndex
+    target_index: ValidatorIndex
+```
+
+
+
+
 
 ### Extended Containers
 
@@ -148,19 +203,41 @@ class BeaconState(Container):
     next_withdrawal_validator_index: ValidatorIndex
     # Deep history valid from Capella onwards
     historical_summaries: List[HistoricalSummary, HISTORICAL_ROOTS_LIMIT]
-    # --- NEW --- #
+    # --- New --- #
     deposit_balance_to_consume: Gwei
-    exit_balance_to_consume: Gwei  # Should be initialized with get_validator_churn_limit(state)
-    earliest_exit_epoch: Epoch  # Should be initialized with the max([v.exit_epoch for v in state.validators if v.exit_epoch != FAR_FUTURE_EPOCH]) + 1
+    exit_balance_to_consume: Gwei  # Initialized with get_validator_churn_limit(state)
+    earliest_exit_epoch: Epoch  # Initialized with the max([v.exit_epoch for v in state.validators if v.exit_epoch != FAR_FUTURE_EPOCH]) + 1
     pending_balance_deposits: List[PendingBalanceDeposit, 100000]
     pending_partial_withdrawals: List[PartialWithdrawal, 100000]
+    pending_consolidations: List[PendingConsolidation, PENDING_CONSOLIDATIONS_LIMIT]
+```
+
+### `BeaconBlockBody`
+
+```python
+class BeaconBlockBody(Container):
+    randao_reveal: BLSSignature
+    eth1_data: Eth1Data  # Eth1 data vote
+    graffiti: Bytes32  # Arbitrary data
+    # Operations
+    proposer_slashings: List[ProposerSlashing, MAX_PROPOSER_SLASHINGS]
+    attester_slashings: List[AttesterSlashing, MAX_ATTESTER_SLASHINGS]
+    attestations: List[Attestation, MAX_ATTESTATIONS]
+    deposits: List[Deposit, MAX_DEPOSITS]
+    voluntary_exits: List[SignedVoluntaryExit, MAX_VOLUNTARY_EXITS]
+    sync_aggregate: SyncAggregate
+    # Execution
+    execution_payload: ExecutionPayload 
+    bls_to_execution_changes: List[SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES]
+    blob_kzg_commitments: List[KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK]
+    consolidations: List[SignedConsolidation, MAX_CONSOLIDATIONS]  # [New in MAXEB]
 ```
 
 ## Helpers
 
 ### Predicates
 
-#### updated `is_eligible_for_activation_queue`
+#### Updated `is_eligible_for_activation_queue`
 
 *Note*: Use `>= MIN_ACTIVATION_BALANCE` instead of `== MAX_EFFECTIVE_BALANCE`
 
@@ -177,7 +254,7 @@ def is_eligible_for_activation_queue(validator: Validator) -> bool:
     )
 ```
 
-#### new `has_compounding_withdrawal_credential`
+#### New `has_compounding_withdrawal_credential`
 
 ```python
 def has_compounding_withdrawal_credential(validator: Validator) -> bool:
@@ -187,7 +264,7 @@ def has_compounding_withdrawal_credential(validator: Validator) -> bool:
     return validator.withdrawal_credentials[:1] == COMPOUNDING_WITHDRAWAL_PREFIX
 ```
 
-#### updated  `is_fully_withdrawable_validator`
+#### Updated  `is_fully_withdrawable_validator`
 
 *Note*: now calls `has_compounding_withdrawal_credential` too.  
 
@@ -205,7 +282,7 @@ def is_fully_withdrawable_validator(validator: Validator, balance: Gwei, epoch: 
     )
 ```
 
-####  updated  `is_partially_withdrawable_validator`
+####  Updated  `is_partially_withdrawable_validator`
 *Note*: now calls `has_compounding_withdrawal_credential` and gets ceiling from `get_balance_ceiling`.
 
 ```python
@@ -222,7 +299,7 @@ def is_partially_withdrawable_validator(validator: Validator, balance: Gwei) -> 
 ### Beacon state accessors
 
 
-#### new `get_validator_excess_balance`
+#### New `get_validator_excess_balance`
 
 ```python
 def get_validator_excess_balance(validator: Validator, balance: Gwei) -> Gwei:
@@ -236,20 +313,40 @@ def get_validator_excess_balance(validator: Validator, balance: Gwei) -> Gwei:
     return Gwei(0)
 ```
 
-#### updated  `get_validator_churn_limit`
+#### Updated  `get_validator_churn_limit`
 
-*Note*: updated to return a Gwei amount of amount of churn per epoch.
+*Note*: Updated to return a Gwei amount of amount of churn per epoch.
 
 ```python
-def get_validator_churn_limit(state: BeaconState) -> Gwei:
-    churn = max(MIN_PER_EPOCH_CHURN_LIMIT * MIN_ACTIVATION_BALANCE, get_total_active_balance(state) // CHURN_LIMIT_QUOTIENT)
+def get_churn_limit(state: BeaconState) -> Gwei:
+    """
+    Return the churn limit for the current epoch.
+    """
+    churn = max(MIN_PER_EPOCH_CHURN_LIMIT_MAXEB, 
+                get_total_active_balance(state) // CHURN_LIMIT_QUOTIENT)
     return churn - churn % EFFECTIVE_BALANCE_INCREMENT
 ```
+
+#### New `get_activation_exit_churn_limit`
+```python
+def get_activation_exit_churn_limit(state: BeaconState) -> Gwei:
+    """
+    Return the churn limit for the current epoch dedicated to activations and exits.
+    """
+    return min(MAX_PER_EPOCH_ACTIVATION_EXIT_CHURN_LIMIT, get_churn_limit(state))
+```
+
+#### New `get_activation_exit_churn_limit`
+```python
+def get_consolidation_churn_limit(state: BeaconState) -> Gwei:
+    return get_churn_limit(state) - get_activation_exit_churn_limit(state)
+```
+
 
 
 ### Beacon state mutators
 
-#### updated  `initiate_validator_exit`
+#### Updated  `initiate_validator_exit`
 
 *Note*: Modification to make validator exits constrained by the balance
 of the exiting validators. 
@@ -272,7 +369,7 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
     validator.withdrawable_epoch = Epoch(validator.exit_epoch + MIN_VALIDATOR_WITHDRAWABILITY_DELAY)
 ```
 
-#### new `compute_exit_epoch_and_update_churn`
+#### New `compute_exit_epoch_and_update_churn`
 
 
 ```python
@@ -295,7 +392,28 @@ def compute_exit_epoch_and_update_churn(state: BeaconState, exit_balance: Gwei) 
     return state.earliest_exit_epoch
 ```
 
-#### updated `slash_validator`
+#### New `compute_consolidation_epoch_and_update_churn`
+
+```python
+def compute_consolidation_epoch_and_update_churn(state: BeaconState, consolidation_balance: Gwei) -> Epoch:
+    earliest_consolidation_epoch = compute_activation_exit_epoch(get_current_epoch(state))
+    per_epoch_consolidation_churn = get_consolidation_churn_limit(state)
+    # New epoch for consolidations.
+    if state.earliest_consolidation_epoch < earliest_consolidation_epoch:
+        state.earliest_consolidation_epoch = earliest_consolidation_epoch
+        state.consolidation_balance_to_consume = per_epoch_consolidation_churn
+    # Consolidation fits in the current earliest consolidation epoch.
+    if consolidation_balance <= state.consolidation_balance_to_consume:
+        state.consolidation_balance_to_consume -= consolidation_balance
+    else: # Consolidation doesn't fit in the current earliest epoch.
+        balance_to_process = consolidation_balance - state.consolidation_balance_to_consume
+        additional_epochs, remainder = divmod(balance_to_process, per_epoch_consolidation_churn)
+        state.earliest_consolidation_epoch += additional_epochs + 1
+        state.consolidation_balance_to_consume = per_epoch_consolidation_churn - remainder
+    return state.earliest_consolidation_epoch
+```
+
+#### Updated `slash_validator`
 
 ```python
 def slash_validator(state: BeaconState,
@@ -309,7 +427,6 @@ def slash_validator(state: BeaconState,
     validator = state.validators[slashed_index]
     validator.slashed = True
     validator.withdrawable_epoch = max(validator.withdrawable_epoch, Epoch(epoch + EPOCHS_PER_SLASHINGS_VECTOR))
-fradamt marked this conversation as resolved.
     state.slashings[epoch % EPOCHS_PER_SLASHINGS_VECTOR] += validator.effective_balance
     slashing_penalty = validator.effective_balance // MIN_SLASHING_PENALTY_QUOTIENT_MAXEB  # [Modified in MAXEB]
     decrease_balance(state, slashed_index, slashing_penalty)
@@ -317,9 +434,10 @@ fradamt marked this conversation as resolved.
 
 
 ## Beacon chain state transition function
+
 ### Epoch processing
 
-#### updated `process_epoch`
+#### Updated `process_epoch`
 ```python
 def process_epoch(state: BeaconState) -> None:
     process_justification_and_finalization(state)
@@ -329,12 +447,13 @@ def process_epoch(state: BeaconState) -> None:
     process_slashings(state)
     process_eth1_data_reset(state)
     process_pending_balance_deposits(state) # New
+    process_pending_consolidations(state) # New
     process_effective_balance_updates(state)
     process_slashings_reset(state)
     process_randao_mixes_reset(state)
 ```
 
-#### updated  `process_registry_updates`
+#### Updated  `process_registry_updates`
 *Note*: changing the dequed validators to depend on the weight of activation up to the
 churn limit. 
 ```python
@@ -356,7 +475,7 @@ def process_registry_updates(state: BeaconState) -> None:
             validator.activation_epoch = activation_epoch
 ```
 
-#### new `process_pending_balance_deposits`
+#### New `process_pending_balance_deposits`
 
 ```python
 def process_pending_balance_deposits(state: BeaconState) -> None:
@@ -373,7 +492,40 @@ def process_pending_balance_deposits(state: BeaconState) -> None:
     state.pending_balance_deposits = state.pending_balance_deposits[next_pending_deposit_index:]
 ```
 
-#### updated `process_effective_balance_updates`
+```python
+def get_active_balance(state: BeaconState, validator: Validator) -> Gwei:
+    active_balance_ceil = MIN_ACTIVATION_BALANCE if has_eth1_withdrawal_credential(validator) else MAX_EFFECTIVE_BALANCE
+    return min(state.balances[validator.index], active_balance_ceil)
+```
+
+```python
+def apply_pending_consolidation(state: BeaconState, pending_consolidation: PendingConsolidation) -> None:
+    source_validator = state.validators[pending_consolidation.source_index]
+    target_validator = state.validators[pending_consolidation.target_index]
+    # Move active balance to target. Excess balance is withdrawable.
+    active_balance = get_active_balance(state, source_validator)
+    state.balances[source_validator.index] -= active_balance
+    state.balances[target_validator.index] += active_balance
+```
+
+```python
+def process_pending_consolidations(state: BeaconState) -> None:
+    next_pending_consolidation = 0
+    for pending_consolidation in state.pending_consolidations:
+        source_validator = state.validators[pending_consolidation.source_index]
+        if source_validator.withdrawable_epoch > get_current_epoch(state):
+            break
+
+        if not source_validator.slashed:
+            apply_pending_consolidation(state, pending_consolidation)
+
+        next_pending_consolidation += 1
+
+    state.pending_consolidations = state.pending_consolidations[next_pending_consolidation:]
+```
+
+
+#### Updated `process_effective_balance_updates`
 
 ```python
 def process_effective_balance_updates(state: BeaconState) -> None:
@@ -393,7 +545,9 @@ def process_effective_balance_updates(state: BeaconState) -> None:
 
 ### Block processing
 
-#### updated `process_operations`
+#### Operations 
+
+##### Updated `process_operations`
 
 ```python
 def process_operations(state: BeaconState, body: BeaconBlockBody) -> None:
@@ -409,9 +563,64 @@ def process_operations(state: BeaconState, body: BeaconBlockBody) -> None:
     for_ops(body.voluntary_exits, process_voluntary_exit)
     for_ops(body.bls_to_execution_changes, process_bls_to_execution_change) 
     for_ops(body.execution_payload.withdraw_request, process_execution_layer_withdraw_request) # New
+    for_ops(body.consolidations, process_consolidation) # New
 ```
 
-#### new `process_execution_layer_withdraw_request`
+##### Deposits
+
+###### Updated  `apply_deposit`
+
+*Note*: Updated to cap top-offs at 32 ETH to avoid skipping activation queue.
+
+```python
+def apply_deposit(state: BeaconState,
+                  pubkey: BLSPubkey,
+                  withdrawal_credentials: Bytes32,
+                  amount: uint64,
+                  signature: BLSSignature) -> None:
+    validator_pubkeys = [validator.pubkey for validator in state.validators]
+    if pubkey not in validator_pubkeys:
+        # Verify the deposit signature (proof of possession) which is not checked by the deposit contract
+        deposit_message = DepositMessage(
+            pubkey=pubkey,
+            withdrawal_credentials=withdrawal_credentials,
+            amount=amount,
+        )
+        domain = compute_domain(DOMAIN_DEPOSIT)  # Fork-agnostic domain since deposits are valid across forks
+        signing_root = compute_signing_root(deposit_message, domain)
+        # Initialize validator if the deposit signature is valid
+        if bls.Verify(pubkey, signing_root, signature):
+            state.validators.append(get_validator_from_deposit(pubkey, withdrawal_credentials))
+            state.balances.append(0)
+            # [New in Altair]
+            state.previous_epoch_participation.append(ParticipationFlags(0b0000_0000))
+            state.current_epoch_participation.append(ParticipationFlags(0b0000_0000))
+            state.inactivity_scores.append(uint64(0))
+            index = len(state.validators) - 1
+            state.pending_balance_deposits.append(PendingBalanceDeposit(index=index, amount=amount))
+    else:
+        index = ValidatorIndex(validator_pubkeys.index(pubkey))
+        state.pending_balance_deposits.append(PendingBalanceDeposit(index=index, amount=amount))
+```
+
+###### Updated `get_validator_from_deposit`
+
+```python
+def get_validator_from_deposit(pubkey: BLSPubkey, withdrawal_credentials: Bytes32) -> Validator:
+    return Validator(
+        pubkey=pubkey,
+        withdrawal_credentials=withdrawal_credentials,
+        activation_eligibility_epoch=FAR_FUTURE_EPOCH,
+        activation_epoch=FAR_FUTURE_EPOCH,
+        exit_epoch=FAR_FUTURE_EPOCH,
+        withdrawable_epoch=FAR_FUTURE_EPOCH,
+        effective_balance=0,
+    )
+```
+
+##### Withdrawals 
+
+###### New `process_execution_layer_withdraw_request`
 
 ```python
 def process_execution_layer_withdraw_request(
@@ -454,7 +663,7 @@ def process_execution_layer_withdraw_request(
         ))
 ```
 
-####  updated  `get_expected_withdrawals`
+######  Updated  `get_expected_withdrawals`
 
 ```python
 def get_expected_withdrawals(state: BeaconState) -> Sequence[Withdrawal]:
@@ -508,56 +717,42 @@ def get_expected_withdrawals(state: BeaconState) -> Sequence[Withdrawal]:
     return withdrawals
 ```
 
-#### Operations 
+##### Consolidations
 
-##### Deposits
-
-**updated  `apply_deposit`**
-
-*Note*: updated to cap top-offs at 32 ETH to avoid skipping activation queue.
+###### New ```process_consolidation```
 
 ```python
-def apply_deposit(state: BeaconState,
-                  pubkey: BLSPubkey,
-                  withdrawal_credentials: Bytes32,
-                  amount: uint64,
-                  signature: BLSSignature) -> None:
-    validator_pubkeys = [validator.pubkey for validator in state.validators]
-    if pubkey not in validator_pubkeys:
-        # Verify the deposit signature (proof of possession) which is not checked by the deposit contract
-        deposit_message = DepositMessage(
-            pubkey=pubkey,
-            withdrawal_credentials=withdrawal_credentials,
-            amount=amount,
-        )
-        domain = compute_domain(DOMAIN_DEPOSIT)  # Fork-agnostic domain since deposits are valid across forks
-        signing_root = compute_signing_root(deposit_message, domain)
-        # Initialize validator if the deposit signature is valid
-        if bls.Verify(pubkey, signing_root, signature):
-            state.validators.append(get_validator_from_deposit(pubkey, withdrawal_credentials))
-            state.balances.append(0)
-            # [New in Altair]
-            state.previous_epoch_participation.append(ParticipationFlags(0b0000_0000))
-            state.current_epoch_participation.append(ParticipationFlags(0b0000_0000))
-            state.inactivity_scores.append(uint64(0))
-            index = len(state.validators) - 1
-            state.pending_balance_deposits.append(PendingBalanceDeposit(index=index, amount=amount))
-    else:
-        index = ValidatorIndex(validator_pubkeys.index(pubkey))
-        state.pending_balance_deposits.append(PendingBalanceDeposit(index=index, amount=amount))
+def process_consolidation(state: BeaconState, signed_consolidation: SignedConsolidation) -> None:
+    assert(len(state.pending_consolidations) < PENDING_CONSOLIDATIONS_LIMIT)
+    consolidation = signed_consolidation.message
+    target_validator = state.validators[consolidation.target_index]
+    source_validator = state.validators[consolidation.source_index]
+    # Verify the source and the target are active
+    assert is_active_validator(source_validator)
+    assert is_active_validator(target_validator)
+    # Verify exits for source and target have not been initiated
+    assert source_validator.exit_epoch == FAR_FUTURE_EPOCH
+    assert target_validator.exit_epoch == FAR_FUTURE_EPOCH
+    # Consolidations must specify an epoch when they become valid; they are not valid before then
+    assert get_current_epoch(state) >= consolidation.epoch 
+
+    # Verify the source and the target have Execution layer withdrawal credentials
+    assert source_validator.withdrawal_credentials[:1] in (ETH1_ADDRESS_WITHDRAWAL_PREFIX, COMPOUNDING_WITHDRAWAL_PREFIX)
+    assert target_validator.withdrawal_credentials[:1] in (ETH1_ADDRESS_WITHDRAWAL_PREFIX, COMPOUNDING_WITHDRAWAL_PREFIX)
+    # Verify the same withdrawal address
+    assert source_validator.withdrawal_credentials[1:] == target_validator.withdrawal_credentials[1:]
+
+    # Verify consolidation is signed by the source and the target
+    domain = compute_domain(DOMAIN_CONSOLIDATION, genesis_validators_root=state.genesis_validators_root)
+    signing_root = compute_signing_root(consolidation, domain)
+    pubkeys = [source_validator.pubkey, target_validator.pubkey]
+    assert bls.FastAggregateVerify(pubkeys, signing_root, signed_consolidation.signature)
+
+    # Initiate source validator exit and append pending consolidation
+    active_balance = get_active_balance(state, source_validator)
+    source_validator.exit_epoch = compute_consolidation_epoch_and_update_churn(state, active_balance)
+    source_validator.withdrawable_epoch = Epoch(source_validator.exit_epoch + config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY)
+    state.pending_consolidations.append(PendingConsolidation(source_index = source_validator.index,
+                                                             target_index = target_validator.index))
 ```
 
-#### updated `get_validator_from_deposit`
-
-```python
-def get_validator_from_deposit(pubkey: BLSPubkey, withdrawal_credentials: Bytes32) -> Validator:
-    return Validator(
-        pubkey=pubkey,
-        withdrawal_credentials=withdrawal_credentials,
-        activation_eligibility_epoch=FAR_FUTURE_EPOCH,
-        activation_epoch=FAR_FUTURE_EPOCH,
-        exit_epoch=FAR_FUTURE_EPOCH,
-        withdrawable_epoch=FAR_FUTURE_EPOCH,
-        effective_balance=0,
-    )
-```

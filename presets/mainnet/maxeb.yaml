@@ -6,3 +6,17 @@
 MIN_ACTIVATION_BALANCE: 32000000000
 # 2**11 * 10**9 (= 2,048,000,000,000) Gwei
 MAX_EFFECTIVE_BALANCE_MAXEB: 2048000000000
+
+# State list lengths
+# ---------------------------------------------------------------
+PENDING_CONSOLIDATIONS_LIMIT: 262144
+
+# Reward and penalty quotients
+# ---------------------------------------------------------------
+MIN_SLASHING_PENALTY_QUOTIENT_MAXEB: 65536 
+
+# Max operations per block
+# ---------------------------------------------------------------
+MAX_CONSOLIDATIONS: 1
+
+
