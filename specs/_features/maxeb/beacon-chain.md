@@ -650,7 +650,7 @@ def process_execution_layer_withdraw_request(
 
     # New condition: only allow partial withdrawals witb compounding withdrawal credentials
     is_full_exit_request = amount == 0
-    if not (is_full_exit_request or has_compounding_withdrawal_credential(validator))
+    if not (is_full_exit_request or has_compounding_withdrawal_credential(validator)):
         return
 
     pending_balance_to_withdraw = sum(item.amount for item in state.pending_partial_withdrawals if item.index == validator_index)
@@ -732,7 +732,7 @@ def process_consolidation(state: BeaconState, signed_consolidation: SignedConsol
     consolidation = signed_consolidation.message
     # Verify that source != target, so a consolidation cannot be used as an exit.
     assert consolidation.source_index != consolidation.target_index
-    
+
     source_validator = state.validators[consolidation.source_index]
     target_validator = state.validators[consolidation.target_index]
     # Verify the source and the target are active

@@ -59,6 +59,37 @@ def test_basic_consolidation(spec, state):
 @spec_test
 @single_phase
 @with_presets([MINIMAL])
+def test_basic_consolidation_with_compounding_credential(spec, state):
+    # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
+    consolidation_churn_limit = spec.get_consolidation_churn_limit(state)
+    # Set the consolidation balance to consume equal to churn limit
+    state.consolidation_balance_to_consume = consolidation_churn_limit
+    current_epoch = spec.get_current_epoch(state)
+    source_index = spec.get_active_validator_indices(state, current_epoch)[0]
+    target_index = spec.get_active_validator_indices(state, current_epoch)[1]
+    source_privkey = pubkey_to_privkey[state.validators[source_index].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[target_index].pubkey]
+
+    # Set source and target withdrawal credentials to the same eth1 credential
+    set_compounding_withdrawal_credential(spec, state, source_index)
+    set_compounding_withdrawal_credential(spec, state, target_index)
+
+    signed_consolidation = sign_consolidation(spec, state, 
+                                             spec.Consolidation(epoch=current_epoch, source_index=source_index, target_index=target_index), 
+                                             source_privkey, target_privkey)
+    yield from run_consolidation_processing(spec, state, signed_consolidation)
+
+    expected_exit_epoch = spec.compute_activation_exit_epoch(current_epoch)
+    # Check consolidation churn is decremented correctly
+    assert state.consolidation_balance_to_consume == consolidation_churn_limit  - spec.MIN_ACTIVATION_BALANCE
+    # Check exit epoch
+    assert state.validators[0].exit_epoch == expected_exit_epoch
+
+@with_maxeb_and_later
+@with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
+@spec_test
+@single_phase
+@with_presets([MINIMAL])
 def test_consolidation_churn_limit_balance(spec, state):
     # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
     consolidation_churn_limit = spec.get_consolidation_churn_limit(state)
@@ -349,3 +380,173 @@ def test_multiple_consolidations_equal_twice_churn(spec, state):
         assert state.validators[2*i].exit_epoch == first_exit_epoch + 1
 
 
+## Failing tests
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_source_equals_target(spec, state):
+    current_epoch = spec.get_current_epoch(state)
+    validator_index = spec.get_active_validator_indices(state, current_epoch)[0]
+    validator_privkey = pubkey_to_privkey[state.validators[validator_index].pubkey]
+
+    # Set withdrawal credentials to eth1
+    set_eth1_withdrawal_credential_with_balance(spec, state, validator_index)
+
+    signed_consolidation = sign_consolidation(spec, state, 
+                                             spec.Consolidation(epoch=current_epoch, source_index=validator_index, target_index=validator_index), 
+                                             validator_privkey, validator_privkey)
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_exceed_pending_consolidations_limit(spec, state):
+    state.pending_consolidations = [spec.PendingConsolidation(source_index = 0,target_index = 1)] * spec.PENDING_CONSOLIDATIONS_LIMIT
+    current_epoch = spec.get_current_epoch(state)
+    source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
+    # Set source and target withdrawal credentials to the same eth1 credential
+    set_eth1_withdrawal_credential_with_balance(spec, state, 0)
+    set_eth1_withdrawal_credential_with_balance(spec, state, 1)
+    signed_consolidation = sign_consolidation(spec, state, 
+                                            spec.Consolidation(epoch=current_epoch, source_index=0, target_index=1), 
+                                            source_privkey, target_privkey)
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
+
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_exited_source(spec, state):
+    current_epoch = spec.get_current_epoch(state)
+    source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
+    set_eth1_withdrawal_credential_with_balance(spec, state, 0)
+    set_eth1_withdrawal_credential_with_balance(spec, state, 1)
+    signed_consolidation = sign_consolidation(spec, state, 
+                                            spec.Consolidation(epoch=current_epoch, source_index=0, target_index=1), 
+                                            source_privkey, target_privkey)
+    # exit source
+    spec.initiate_validator_exit(state, 0)
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
+
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_exited_target(spec, state):
+    current_epoch = spec.get_current_epoch(state)
+    source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
+    # Set source and target withdrawal credentials to the same eth1 credential
+    set_eth1_withdrawal_credential_with_balance(spec, state, 0)
+    set_eth1_withdrawal_credential_with_balance(spec, state, 1)
+    signed_consolidation = sign_consolidation(spec, state, 
+                                            spec.Consolidation(epoch=current_epoch, source_index=0, target_index=1), 
+                                            source_privkey, target_privkey)
+    # exit target
+    spec.initiate_validator_exit(state, 1)
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_inactive_source(spec, state):
+    current_epoch = spec.get_current_epoch(state)
+    source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
+    set_eth1_withdrawal_credential_with_balance(spec, state, 0)
+    set_eth1_withdrawal_credential_with_balance(spec, state, 1)
+    signed_consolidation = sign_consolidation(spec, state, 
+                                            spec.Consolidation(epoch=current_epoch, source_index=0, target_index=1), 
+                                            source_privkey, target_privkey)
+    # set source validator as not yet activated
+    state.validators[0].activation_epoch = spec.FAR_FUTURE_EPOCH
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
+
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_inactive_target(spec, state):
+    current_epoch = spec.get_current_epoch(state)
+    source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
+    # Set source and target withdrawal credentials to the same eth1 credential
+    set_eth1_withdrawal_credential_with_balance(spec, state, 0)
+    set_eth1_withdrawal_credential_with_balance(spec, state, 1)
+    signed_consolidation = sign_consolidation(spec, state, 
+                                            spec.Consolidation(epoch=current_epoch, source_index=0, target_index=1), 
+                                            source_privkey, target_privkey)
+    # set target validator as not yet activated
+    state.validators[1].activation_epoch = spec.FAR_FUTURE_EPOCH
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
+
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_no_execution_withdrawal_credential(spec, state):
+    current_epoch = spec.get_current_epoch(state)
+    source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
+    signed_consolidation = sign_consolidation(spec, state, 
+                                            spec.Consolidation(epoch=current_epoch, source_index=0, target_index=1), 
+                                            source_privkey, target_privkey)
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_different_credentials(spec, state):
+    current_epoch = spec.get_current_epoch(state)
+    source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
+    signed_consolidation = sign_consolidation(spec, state, 
+                                            spec.Consolidation(epoch=current_epoch, source_index=0, target_index=1), 
+                                            source_privkey, target_privkey)
+    # Set source and target withdrawal credentials to different eth1 credentials
+    set_eth1_withdrawal_credential_with_balance(spec, state, 0)
+    set_eth1_withdrawal_credential_with_balance(spec, state, 1, address=b'\x10'*20)
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
+
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_inactive_source_signature(spec, state):
+    current_epoch = spec.get_current_epoch(state)
+    source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
+    # Set source and target withdrawal credentials to the same eth1 credential
+    set_eth1_withdrawal_credential_with_balance(spec, state, 0)
+    set_eth1_withdrawal_credential_with_balance(spec, state, 1)
+    signed_consolidation = sign_consolidation(spec, state, 
+                                            spec.Consolidation(epoch=current_epoch, source_index=0, target_index=1), 
+                                            source_privkey, target_privkey)
+    # Change the pubkey of the source validator, invalidating its signature
+    state.validators[0].pubkey = state.validators[1].pubkey
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_inactive_target_signature(spec, state):
+    current_epoch = spec.get_current_epoch(state)
+    source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
+    # Set source and target withdrawal credentials to the same eth1 credential
+    set_eth1_withdrawal_credential_with_balance(spec, state, 0)
+    set_eth1_withdrawal_credential_with_balance(spec, state, 1)
+    signed_consolidation = sign_consolidation(spec, state, 
+                                            spec.Consolidation(epoch=current_epoch, source_index=0, target_index=1), 
+                                            source_privkey, target_privkey)
+    # Change the pubkey of the target validator, invalidating its signature
+    state.validators[1].pubkey = state.validators[2].pubkey
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
+
+@with_maxeb_and_later
+@spec_state_test
+def test_invalid_before_specified_epoch(spec, state):
+    current_epoch = spec.get_current_epoch(state)
+    source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
+    target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
+    # Set source and target withdrawal credentials to the same eth1 credential
+    set_eth1_withdrawal_credential_with_balance(spec, state, 0)
+    set_eth1_withdrawal_credential_with_balance(spec, state, 1)
+    # set epoch=current_epoch + 1, so it's too early to process it
+    signed_consolidation = sign_consolidation(spec, state, 
+                                            spec.Consolidation(epoch=current_epoch+1, source_index=0, target_index=1), 
+                                            source_privkey, target_privkey)
+    yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
