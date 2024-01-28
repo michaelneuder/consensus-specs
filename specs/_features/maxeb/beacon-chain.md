@@ -730,6 +730,9 @@ def get_expected_withdrawals(state: BeaconState) -> Sequence[Withdrawal]:
 def process_consolidation(state: BeaconState, signed_consolidation: SignedConsolidation) -> None:
     assert(len(state.pending_consolidations) < PENDING_CONSOLIDATIONS_LIMIT)
     consolidation = signed_consolidation.message
+    # Verify that source != target, so a consolidation cannot be used as an exit.
+    assert consolidation.source_index != consolidation.target_index
+    
     source_validator = state.validators[consolidation.source_index]
     target_validator = state.validators[consolidation.target_index]
     # Verify the source and the target are active
