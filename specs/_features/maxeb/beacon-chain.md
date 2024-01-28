@@ -630,6 +630,7 @@ def process_execution_layer_withdraw_request(
     validator_pubkeys = [v.pubkey for v in state.validators]
     validator_index = ValidatorIndex(validator_pubkeys.index(execution_layer_withdraw_request.validator_pubkey))
     validator = state.validators[validator_index]
+    amount = execution_layer_withdraw_request.amount
 
     # Same conditions as in EIP7002 https://github.com/ethereum/consensus-specs/pull/3349/files#diff-7a6e2ba480d22d8bd035bd88ca91358456caf9d7c2d48a74e1e900fe63d5c4f8R223
     # Verify withdrawal credentials
@@ -647,10 +648,14 @@ def process_execution_layer_withdraw_request(
     if get_current_epoch(state) < validator.activation_epoch + SHARD_COMMITTEE_PERIOD:
         return
 
+    # New condition: only allow partial withdrawals witb compounding withdrawal credentials
+    is_full_exit_request = amount == 0
+    if not (is_full_exit_request or has_compounding_withdrawal_credential(validator))
+        return
+
     pending_balance_to_withdraw = sum(item.amount for item in state.pending_partial_withdrawals if item.index == validator_index)
-    amount = execution_layer_withdraw_request.amount
-    # amount = 0 indicates an exit, but only exit if there are no other pending withdrawals
-    if amount == 0 and pending_balance_to_withdraw == 0:
+    # only exit validator if it has no pending withdrawals in the queue
+    if is_full_exit_request and pending_balance_to_withdraw == 0:
         initiate_validator_exit(state, validator_index)
     elif state.balances[validator_index] > MIN_ACTIVATION_BALANCE + pending_balance_to_withdraw:
         to_withdraw = min(state.balances[validator_index] - MIN_ACTIVATION_BALANCE - pending_balance_to_withdraw, amount)
