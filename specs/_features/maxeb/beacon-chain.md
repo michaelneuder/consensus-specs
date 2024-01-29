@@ -562,7 +562,7 @@ def process_operations(state: BeaconState, body: BeaconBlockBody) -> None:
     for_ops(body.deposits, process_deposit)
     for_ops(body.voluntary_exits, process_voluntary_exit)
     for_ops(body.bls_to_execution_changes, process_bls_to_execution_change) 
-    for_ops(body.execution_payload.withdraw_request, process_execution_layer_withdraw_request) # New
+    for_ops(body.execution_payload.withdraw_requests, process_execution_layer_withdraw_request) # New
     for_ops(body.consolidations, process_consolidation) # New
 ```
 
