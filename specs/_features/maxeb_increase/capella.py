@@ -1677,17 +1677,15 @@ def process_pending_balance_deposits(state: BeaconState) -> None:
     state.pending_balance_deposits = state.pending_balance_deposits[next_pending_deposit_index:]
 
 
-def get_active_balance(state: BeaconState, validator: Validator) -> Gwei:
-    active_balance_ceil = MIN_ACTIVATION_BALANCE if has_eth1_withdrawal_credential(validator) else MAX_EFFECTIVE_BALANCE
-    return min(state.balances[validator.index], active_balance_ceil)
+def get_active_balance(state: BeaconState, validator_index: ValidatorIndex) -> Gwei:
+    active_balance_ceil = MIN_ACTIVATION_BALANCE if has_eth1_withdrawal_credential(state.validators[validator_index]) else MAX_EFFECTIVE_BALANCE
+    return min(state.balances[validator_index], active_balance_ceil)
 
 def apply_pending_consolidation(state: BeaconState, pending_consolidation: PendingConsolidation) -> None:
-    source_validator = state.validators[pending_consolidation.source_index]
-    target_validator = state.validators[pending_consolidation.target_index]
     # Move active balance to target. Excess balance will be withdrawn.
-    active_balance = get_active_balance(state, source_validator)
-    state.balances[source_validator.index] -= active_balance
-    state.balances[target_validator.index] += active_balance
+    active_balance = get_active_balance(state, pending_consolidation.source_index)
+    state.balances[pending_consolidation.source_index] -= active_balance
+    state.balances[pending_consolidation.target_index] += active_balance
 
 
 def process_pending_consolidations(state: BeaconState) -> None:
@@ -1828,7 +1826,7 @@ def process_execution_layer_withdraw_request(
 
     # Same conditions as in EIP7002 https://github.com/ethereum/consensus-specs/pull/3349/files#diff-7a6e2ba480d22d8bd035bd88ca91358456caf9d7c2d48a74e1e900fe63d5c4f8R223
     # Verify withdrawal credentials
-    is_execution_address = validator.withdrawal_credentials[:1] == ETH1_ADDRESS_WITHDRAWAL_PREFIX
+    is_execution_address = validator.withdrawal_credentials[:1] == COMPOUNDING_WITHDRAWAL_PREFIX
     is_correct_source_address = validator.withdrawal_credentials[12:] == execution_layer_withdraw_request.source_address
     if not (is_execution_address and is_correct_source_address):
         return
@@ -2020,8 +2018,8 @@ def process_consolidation(state: BeaconState, signed_consolidation: SignedConsol
     target_validator = state.validators[consolidation.target_index]
     source_validator = state.validators[consolidation.source_index]
     # Verify the source and the target are active
-    assert is_active_validator(source_validator)
-    assert is_active_validator(target_validator)
+    assert is_active_validator(source_validator, get_current_epoch(state))
+    assert is_active_validator(target_validator, get_current_epoch(state))
     # Verify exits for source and target have not been initiated
     assert source_validator.exit_epoch == FAR_FUTURE_EPOCH
     assert target_validator.exit_epoch == FAR_FUTURE_EPOCH
@@ -2041,11 +2039,11 @@ def process_consolidation(state: BeaconState, signed_consolidation: SignedConsol
     assert bls.FastAggregateVerify(pubkeys, signing_root, signed_consolidation.signature)
 
     # Initiate source validator exit and append pending consolidation
-    active_balance = get_active_balance(state, source_validator)
+    active_balance = get_active_balance(state, consolidation.source_index)
     source_validator.exit_epoch = compute_consolidation_epoch_and_update_churn(state, active_balance)
     source_validator.withdrawable_epoch = Epoch(source_validator.exit_epoch + config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY)
-    state.pending_consolidations.append(PendingConsolidation(source_index = source_validator.index,
-                                                             target_index = target_validator.index))
+    state.pending_consolidations.append(PendingConsolidation(source_index = consolidation.source_index,
+                                                             target_index = consolidation.target_index))
 
 
 def is_previous_epoch_justified(store: Store) -> bool:
