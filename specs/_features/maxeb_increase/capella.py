@@ -1239,7 +1239,7 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
         return
 
     # Compute exit queue epoch
-    exit_queue_epoch = compute_exit_epoch_and_update_churn(state, state.balances[index])
+    exit_queue_epoch = compute_exit_epoch_and_update_churn(state, validator.effective_balance)
 
     # Set validator exit epoch and withdrawable epoch
     validator.exit_epoch = exit_queue_epoch
