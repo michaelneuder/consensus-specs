@@ -1,11 +1,11 @@
 from eth2spec.test.helpers.epoch_processing import run_epoch_processing_with
 from eth2spec.test.context import (
     spec_state_test,
-    with_maxeb_and_later,
+    with_eip7251_and_later,
     with_presets,
 )
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_pending_deposit_min_activation_balance(spec, state):
     index = 0
@@ -17,7 +17,7 @@ def test_pending_deposit_min_activation_balance(spec, state):
     assert state.deposit_balance_to_consume == spec.get_activation_exit_churn_limit(state) - amount
     assert state.pending_balance_deposits == []
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_pending_deposit_balance_equal_churn(spec, state):
     index = 0
@@ -29,7 +29,7 @@ def test_pending_deposit_balance_equal_churn(spec, state):
     assert state.deposit_balance_to_consume == 0
     assert state.pending_balance_deposits == []
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_pending_deposit_balance_above_churn(spec, state):
     index = 0
@@ -44,7 +44,7 @@ def test_pending_deposit_balance_above_churn(spec, state):
     # deposit is still in the queue
     assert state.pending_balance_deposits == [spec.PendingBalanceDeposit(index=index, amount=amount)]
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_pending_deposit_preexisting_churn(spec, state):
     index = 0
@@ -60,7 +60,7 @@ def test_pending_deposit_preexisting_churn(spec, state):
     # queue emptied
     assert state.pending_balance_deposits == []
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_multiple_pending_deposits_below_churn(spec, state):
     amount = 10**9
@@ -73,7 +73,7 @@ def test_multiple_pending_deposits_below_churn(spec, state):
     assert state.deposit_balance_to_consume == spec.get_activation_exit_churn_limit(state) - 2*amount
     assert state.pending_balance_deposits == []
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_multiple_pending_deposits_above_churn(spec, state):
     # set third deposit to be over the churn

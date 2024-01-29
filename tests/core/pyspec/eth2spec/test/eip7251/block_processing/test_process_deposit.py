@@ -1,19 +1,19 @@
 from eth2spec.test.helpers.deposits import (
     build_deposit,
     prepare_state_and_deposit,
-    run_deposit_processing_maxeb,
-    run_deposit_processing_maxeb_with_specific_fork_version,
+    run_deposit_processing_eip7251,
+    run_deposit_processing_eip7251_with_specific_fork_version,
     sign_deposit_data,
 )
 from eth2spec.test.helpers.keys import privkeys, pubkeys
 
 from eth2spec.test.context import (
     spec_state_test,
-    with_maxeb_and_later,
+    with_eip7251_and_later,
     always_bls,
 )
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_new_deposit_under_min_activation_balance(spec, state):
     # fresh deposit = next validator index = validator appended to registry
@@ -22,66 +22,66 @@ def test_new_deposit_under_min_activation_balance(spec, state):
     amount = spec.MIN_ACTIVATION_BALANCE - 1
     deposit = prepare_state_and_deposit(spec, state, validator_index, amount, signed=True)
 
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_new_deposit_min(spec, state):
     # fresh deposit = next validator index = validator appended to registry
     validator_index = len(state.validators)
     amount = spec.MIN_DEPOSIT_AMOUNT
     deposit = prepare_state_and_deposit(spec, state, validator_index, amount, signed=True)
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_new_deposit_between_min_and_max(spec, state):
     # fresh deposit = next validator index = validator appended to registry
     validator_index = len(state.validators)
-    amount = spec.MAX_EFFECTIVE_BALANCE_MAXEB // 2
+    amount = spec.MAX_EFFECTIVE_BALANCE_EIP7251 // 2
     deposit = prepare_state_and_deposit(spec, state, validator_index, amount, signed=True)
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_new_deposit_max(spec, state):
     # fresh deposit = next validator index = validator appended to registry
     validator_index = len(state.validators)
     # effective balance will be exactly the same as balance.
-    amount = spec.MAX_EFFECTIVE_BALANCE_MAXEB
+    amount = spec.MAX_EFFECTIVE_BALANCE_EIP7251
     deposit = prepare_state_and_deposit(spec, state, validator_index, amount, signed=True)
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_new_deposit_over_max(spec, state):
     # fresh deposit = next validator index = validator appended to registry
     validator_index = len(state.validators)
-    amount = spec.MAX_EFFECTIVE_BALANCE_MAXEB + 1
+    amount = spec.MAX_EFFECTIVE_BALANCE_EIP7251 + 1
     deposit = prepare_state_and_deposit(spec, state, validator_index, amount, signed=True)
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
 
 
 
-# @with_maxeb_and_later
+# @with_eip7251_and_later
 # @spec_state_test
 # def test_top_up__max_effective_balance(spec, state):
 #     validator_index = 0
-#     amount = spec.MAX_EFFECTIVE_BALANCE_MAXEB // 4
+#     amount = spec.MAX_EFFECTIVE_BALANCE_EIP7251 // 4
 #     deposit = prepare_state_and_deposit(spec, state, validator_index, amount, signed=True)
 
-#     state.balances[validator_index] = spec.MAX_EFFECTIVE_BALANCE_MAXEB
-#     state.validators[validator_index].effective_balance = spec.MAX_EFFECTIVE_BALANCE_MAXEB
+#     state.balances[validator_index] = spec.MAX_EFFECTIVE_BALANCE_EIP7251
+#     state.validators[validator_index].effective_balance = spec.MAX_EFFECTIVE_BALANCE_EIP7251
 
-#     yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+#     yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
-#     assert state.balances[validator_index] == spec.MAX_EFFECTIVE_BALANCE_MAXEB + amount
-#     assert state.validators[validator_index].effective_balance == spec.MAX_EFFECTIVE_BALANCE_MAXEB
+#     assert state.balances[validator_index] == spec.MAX_EFFECTIVE_BALANCE_EIP7251 + amount
+#     assert state.validators[validator_index].effective_balance == spec.MAX_EFFECTIVE_BALANCE_EIP7251
     
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 @always_bls
 def test_correct_sig_but_forked_state(spec, state):
@@ -90,10 +90,10 @@ def test_correct_sig_but_forked_state(spec, state):
     # deposits will always be valid, regardless of the current fork
     state.fork.current_version = spec.Version('0x1234abcd')
     deposit = prepare_state_and_deposit(spec, state, validator_index, amount, signed=True)
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 @always_bls
 def test_incorrect_sig_new_deposit(spec, state):
@@ -101,10 +101,10 @@ def test_incorrect_sig_new_deposit(spec, state):
     validator_index = len(state.validators)
     amount = spec.MIN_ACTIVATION_BALANCE
     deposit = prepare_state_and_deposit(spec, state, validator_index, amount)
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index, effective=False)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index, effective=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_top_up__max_effective_balance(spec, state):
     validator_index = 0
@@ -114,12 +114,12 @@ def test_top_up__max_effective_balance(spec, state):
     state.balances[validator_index] = spec.MAX_EFFECTIVE_BALANCE
     state.validators[validator_index].effective_balance = spec.MAX_EFFECTIVE_BALANCE
 
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
     assert state.validators[validator_index].effective_balance == spec.MAX_EFFECTIVE_BALANCE
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_top_up__less_effective_balance(spec, state):
     validator_index = 0
@@ -131,13 +131,13 @@ def test_top_up__less_effective_balance(spec, state):
     state.balances[validator_index] = initial_balance
     state.validators[validator_index].effective_balance = initial_effective_balance
 
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
     # unchanged effective balance
     assert state.validators[validator_index].effective_balance == initial_effective_balance
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_top_up__zero_balance(spec, state):
     validator_index = 0
@@ -149,13 +149,13 @@ def test_top_up__zero_balance(spec, state):
     state.balances[validator_index] = initial_balance
     state.validators[validator_index].effective_balance = initial_effective_balance
 
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
     # unchanged effective balance
     assert state.validators[validator_index].effective_balance == initial_effective_balance
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 @always_bls
 def test_incorrect_sig_top_up(spec, state):
@@ -164,10 +164,10 @@ def test_incorrect_sig_top_up(spec, state):
     deposit = prepare_state_and_deposit(spec, state, validator_index, amount)
 
     # invalid signatures, in top-ups, are allowed!
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_incorrect_withdrawal_credentials_top_up(spec, state):
     validator_index = 0
@@ -182,10 +182,10 @@ def test_incorrect_withdrawal_credentials_top_up(spec, state):
     )
 
     # inconsistent withdrawal credentials, in top-ups, are allowed!
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_wrong_deposit_for_deposit_count(spec, state):
     deposit_data_leaves = [spec.DepositData() for _ in range(len(state.validators))]
@@ -223,10 +223,10 @@ def test_invalid_wrong_deposit_for_deposit_count(spec, state):
     state.eth1_data.deposit_root = root_2
     state.eth1_data.deposit_count = deposit_count_1
 
-    yield from run_deposit_processing_maxeb(spec, state, deposit_2, index_2, valid=False)
+    yield from run_deposit_processing_eip7251(spec, state, deposit_2, index_2, valid=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_bad_merkle_proof(spec, state):
     validator_index = len(state.validators)
@@ -238,10 +238,10 @@ def test_invalid_bad_merkle_proof(spec, state):
 
     sign_deposit_data(spec, deposit.data, privkeys[validator_index])
 
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index, valid=False)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index, valid=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_key_validate_invalid_subgroup(spec, state):
     validator_index = len(state.validators)
@@ -252,10 +252,10 @@ def test_key_validate_invalid_subgroup(spec, state):
 
     deposit = prepare_state_and_deposit(spec, state, validator_index, amount, pubkey=pubkey, signed=True)
 
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_key_validate_invalid_decompression(spec, state):
     validator_index = len(state.validators)
@@ -268,14 +268,14 @@ def test_key_validate_invalid_decompression(spec, state):
 
     deposit = prepare_state_and_deposit(spec, state, validator_index, amount, pubkey=pubkey, signed=True)
 
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 @always_bls
 def test_ineffective_deposit_with_bad_fork_version(spec, state):
-    yield from run_deposit_processing_maxeb_with_specific_fork_version(
+    yield from run_deposit_processing_eip7251_with_specific_fork_version(
         spec,
         state,
         fork_version=spec.Version('0xAaBbCcDd'),

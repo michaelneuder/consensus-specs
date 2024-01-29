@@ -1,4 +1,4 @@
-# MAXEB - Spec
+# EIP7251 - Spec
 
 ## Table of contents
 
@@ -70,13 +70,13 @@ The following values are (non-configurable) constants used throughout the specif
 | Name | Value |
 | - | - |
 | `MIN_ACTIVATION_BALANCE` | `Gwei(2**5 * 10**9)`  (= 32,000,000,000) |
-| `MAX_EFFECTIVE_BALANCE_MAXEB` | `Gwei(2**11 * 10**9)` (= 2048,000,000,000) |
+| `MAX_EFFECTIVE_BALANCE_EIP7251` | `Gwei(2**11 * 10**9)` (= 2048,000,000,000) |
 
 ### Rewards and penalties
 
 | Name | Value |
 | - | - |
-| `MIN_SLASHING_PENALTY_QUOTIENT_MAXEB` | `Gwei(2**16)`  (= 65,536) |
+| `MIN_SLASHING_PENALTY_QUOTIENT_EIP7251` | `Gwei(2**16)`  (= 65,536) |
 
 ### Max operations per block
 
@@ -96,7 +96,7 @@ The following values are (non-configurable) constants used throughout the specif
 
 | Name | Value |
 | - | - |
-| `MIN_PER_EPOCH_CHURN_LIMIT_MAXEB` | `Gwei(2**7 * 10**9)` (= 128,000,000,000) | # Equivalent to 4 32 ETH validators
+| `MIN_PER_EPOCH_CHURN_LIMIT_EIP7251` | `Gwei(2**7 * 10**9)` (= 128,000,000,000) | # Equivalent to 4 32 ETH validators
 | `MAX_PER_EPOCH_ACTIVATION_EXIT_CHURN_LIMIT` | `Gwei(2**8 * 10**9)` (256,000,000,000) |
 
 
@@ -203,10 +203,10 @@ class BeaconState(Container):
     next_withdrawal_validator_index: ValidatorIndex
     # Deep history valid from Capella onwards
     historical_summaries: List[HistoricalSummary, HISTORICAL_ROOTS_LIMIT]
-    # --- New --- #
+    # --- New in EIP7251--- #
     deposit_balance_to_consume: Gwei
-    exit_balance_to_consume: Gwei  # Initialized with get_activation_exit_churn_limit(state)
-    earliest_exit_epoch: Epoch  # Initialized with the max([v.exit_epoch for v in state.validators if v.exit_epoch != FAR_FUTURE_EPOCH]) + 1
+    exit_balance_to_consume: Gwei
+    earliest_exit_epoch: Epoch
     consolidation_balance_to_consume: Gwei
     earliest_consolidation_epoch: Epoch
     pending_balance_deposits: List[PendingBalanceDeposit, 100000]
@@ -232,7 +232,7 @@ class BeaconBlockBody(Container):
     execution_payload: ExecutionPayload 
     bls_to_execution_changes: List[SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES]
     blob_kzg_commitments: List[KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK]
-    consolidations: List[SignedConsolidation, MAX_CONSOLIDATIONS]  # [New in MAXEB]
+    consolidations: List[SignedConsolidation, MAX_CONSOLIDATIONS]  # [New in EIP7251]
 ```
 
 ## Helpers
@@ -250,9 +250,7 @@ def is_eligible_for_activation_queue(validator: Validator) -> bool:
     """
     return (
         validator.activation_eligibility_epoch == FAR_FUTURE_EPOCH
-        # --- MODIFIED --- #
-        and validator.effective_balance >= MIN_ACTIVATION_BALANCE
-        # --- END MODIFIED --- #
+        and validator.effective_balance >= MIN_ACTIVATION_BALANCE # [Modified in EIP7251]
     )
 ```
 
@@ -276,9 +274,7 @@ def is_fully_withdrawable_validator(validator: Validator, balance: Gwei, epoch: 
     Check if ``validator`` is fully withdrawable.
     """
     return (
-        # --- MODIFIED --- #
-        (has_eth1_withdrawal_credential(validator) or has_compounding_withdrawal_credential(validator))
-        # --- END MODIFIED --- #
+        (has_eth1_withdrawal_credential(validator) or has_compounding_withdrawal_credential(validator)) # [Modified in EIP7251]
         and validator.withdrawable_epoch <= epoch
         and balance > 0
     )
@@ -308,8 +304,8 @@ def get_validator_excess_balance(validator: Validator, balance: Gwei) -> Gwei:
     """
     Get excess balance for partial withdrawals for ``validator``.
     """
-    if has_compounding_withdrawal_credential(validator) and balance > MAX_EFFECTIVE_BALANCE_MAXEB:
-        return balance - MAX_EFFECTIVE_BALANCE_MAXEB
+    if has_compounding_withdrawal_credential(validator) and balance > MAX_EFFECTIVE_BALANCE_EIP7251:
+        return balance - MAX_EFFECTIVE_BALANCE_EIP7251
     elif has_eth1_withdrawal_credential(validator) and balance > MIN_ACTIVATION_BALANCE:
         return balance - MIN_ACTIVATION_BALANCE
     return Gwei(0)
@@ -324,7 +320,7 @@ def get_churn_limit(state: BeaconState) -> Gwei:
     """
     Return the churn limit for the current epoch.
     """
-    churn = max(MIN_PER_EPOCH_CHURN_LIMIT_MAXEB, 
+    churn = max(MIN_PER_EPOCH_CHURN_LIMIT_EIP7251, 
                 get_total_active_balance(state) // CHURN_LIMIT_QUOTIENT)
     return churn - churn % EFFECTIVE_BALANCE_INCREMENT
 ```
@@ -363,7 +359,7 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
     if validator.exit_epoch != FAR_FUTURE_EPOCH:
         return
 
-    # Compute exit queue epoch
+    # Compute exit queue epoch [Modified in EIP 7251]
     exit_queue_epoch = compute_exit_epoch_and_update_churn(state, validator.effective_balance)
 
     # Set validator exit epoch and withdrawable epoch
@@ -430,7 +426,7 @@ def slash_validator(state: BeaconState,
     validator.slashed = True
     validator.withdrawable_epoch = max(validator.withdrawable_epoch, Epoch(epoch + EPOCHS_PER_SLASHINGS_VECTOR))
     state.slashings[epoch % EPOCHS_PER_SLASHINGS_VECTOR] += validator.effective_balance
-    slashing_penalty = validator.effective_balance // MIN_SLASHING_PENALTY_QUOTIENT_MAXEB  # [Modified in MAXEB]
+    slashing_penalty = validator.effective_balance // MIN_SLASHING_PENALTY_QUOTIENT_EIP7251  # [Modified in EIP7251]
     decrease_balance(state, slashed_index, slashing_penalty)
 ```
 
@@ -448,8 +444,8 @@ def process_epoch(state: BeaconState) -> None:
     process_registry_updates(state)
     process_slashings(state)
     process_eth1_data_reset(state)
-    process_pending_balance_deposits(state) # New
-    process_pending_consolidations(state) # New
+    process_pending_balance_deposits(state) # New in EIP7251
+    process_pending_consolidations(state) # New in EIP7251
     process_effective_balance_updates(state)
     process_slashings_reset(state)
     process_randao_mixes_reset(state)
@@ -496,7 +492,7 @@ def process_pending_balance_deposits(state: BeaconState) -> None:
 
 ```python
 def get_active_balance(state: BeaconState, validator_index: ValidatorIndex) -> Gwei:
-    active_balance_ceil = MIN_ACTIVATION_BALANCE if has_eth1_withdrawal_credential(state.validators[validator_index]) else MAX_EFFECTIVE_BALANCE_MAXEB
+    active_balance_ceil = MIN_ACTIVATION_BALANCE if has_eth1_withdrawal_credential(state.validators[validator_index]) else MAX_EFFECTIVE_BALANCE_EIP7251
     return min(state.balances[validator_index], active_balance_ceil)
 ```
 
@@ -536,7 +532,7 @@ def process_effective_balance_updates(state: BeaconState) -> None:
         HYSTERESIS_INCREMENT = uint64(EFFECTIVE_BALANCE_INCREMENT // HYSTERESIS_QUOTIENT)
         DOWNWARD_THRESHOLD = HYSTERESIS_INCREMENT * HYSTERESIS_DOWNWARD_MULTIPLIER
         UPWARD_THRESHOLD = HYSTERESIS_INCREMENT * HYSTERESIS_UPWARD_MULTIPLIER
-        EFFECTIVE_BALANCE_LIMIT = MAX_EFFECTIVE_BALANCE_MAXEB if has_compounding_withdrawal_credential(validator) else MIN_ACTIVATION_BALANCE
+        EFFECTIVE_BALANCE_LIMIT = MAX_EFFECTIVE_BALANCE_EIP7251 if has_compounding_withdrawal_credential(validator) else MIN_ACTIVATION_BALANCE # Modified in EIP7251
         if (
             balance + DOWNWARD_THRESHOLD < validator.effective_balance
             or validator.effective_balance + UPWARD_THRESHOLD < balance
@@ -563,8 +559,8 @@ def process_operations(state: BeaconState, body: BeaconBlockBody) -> None:
     for_ops(body.deposits, process_deposit)
     for_ops(body.voluntary_exits, process_voluntary_exit)
     for_ops(body.bls_to_execution_changes, process_bls_to_execution_change) 
-    for_ops(body.execution_payload.withdraw_requests, process_execution_layer_withdraw_request) # New
-    for_ops(body.consolidations, process_consolidation) # New
+    for_ops(body.execution_payload.withdraw_requests, process_execution_layer_withdraw_request) # New in EIP7251
+    for_ops(body.consolidations, process_consolidation) # New in EIP7251
 ```
 
 ##### Deposits
@@ -593,7 +589,6 @@ def apply_deposit(state: BeaconState,
         if bls.Verify(pubkey, signing_root, signature):
             state.validators.append(get_validator_from_deposit(pubkey, withdrawal_credentials))
             state.balances.append(0)
-            # [New in Altair]
             state.previous_epoch_participation.append(ParticipationFlags(0b0000_0000))
             state.current_epoch_participation.append(ParticipationFlags(0b0000_0000))
             state.inactivity_scores.append(uint64(0))
@@ -615,7 +610,7 @@ def get_validator_from_deposit(pubkey: BLSPubkey, withdrawal_credentials: Bytes3
         activation_epoch=FAR_FUTURE_EPOCH,
         exit_epoch=FAR_FUTURE_EPOCH,
         withdrawable_epoch=FAR_FUTURE_EPOCH,
-        effective_balance=0,
+        effective_balance=0, # [Modified in EIP7251]
     )
 ```
 

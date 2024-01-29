@@ -3,7 +3,7 @@ from eth2spec.test.helpers.epoch_processing import run_epoch_processing_with
 from eth2spec.test.helpers.state import next_epoch
 from eth2spec.test.context import (
     spec_state_test,
-    with_maxeb_and_later,
+    with_eip7251_and_later,
     with_presets, 
     spec_test, single_phase,
     with_custom_state,
@@ -24,7 +24,7 @@ from eth2spec.test.helpers.withdrawals import (
 #  * CONSOLIDATION TESTS *
 #  ***********************
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_basic_pending_consolidation(spec, state):
     current_epoch = spec.get_current_epoch(state)
@@ -41,7 +41,7 @@ def test_basic_pending_consolidation(spec, state):
 
     
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_skip_consolidation_when_source_slashed(spec, state):
     current_epoch = spec.get_current_epoch(state)

@@ -20,7 +20,7 @@ EIP6110 = SpecForkName('eip6110')
 EIP7002 = SpecForkName('eip7002')
 WHISK = SpecForkName('whisk')
 EIP7594 = SpecForkName('eip7594')
-MAXEB = SpecForkName('maxeb')
+EIP7251 = SpecForkName('eip7251')
 
 #
 # SpecFork settings
@@ -41,14 +41,14 @@ ALL_PHASES = (
     EIP6110,
     EIP7002,
     EIP7594,
-    MAXEB,
+    EIP7251,
 )
 # The forks that have light client specs
 LIGHT_CLIENT_TESTING_FORKS = (*[item for item in MAINNET_FORKS if item != PHASE0], DENEB)
 # The forks that output to the test vectors.
 TESTGEN_FORKS = (*MAINNET_FORKS, DENEB, EIP6110, WHISK)
 # Forks allowed in the test runner `--fork` flag, to fail fast in case of typos
-ALLOWED_TEST_RUNNER_FORKS = (*ALL_PHASES, WHISK, MAXEB)
+ALLOWED_TEST_RUNNER_FORKS = (*ALL_PHASES, WHISK, EIP7251)
 
 # NOTE: the same definition as in `pysetup/md_doc_paths.py`
 PREVIOUS_FORK_OF = {
@@ -63,7 +63,7 @@ PREVIOUS_FORK_OF = {
     WHISK: CAPELLA,
     EIP7002: CAPELLA,
     EIP7594: DENEB,
-    MAXEB: DENEB,
+    EIP7251: DENEB,
 }
 
 # For fork transition tests
@@ -73,7 +73,7 @@ POST_FORK_OF = {
     ALTAIR: BELLATRIX,
     BELLATRIX: CAPELLA,
     CAPELLA: DENEB,
-    DENEB: MAXEB,
+    DENEB: EIP7251,
 }
 
 ALL_PRE_POST_FORKS = POST_FORK_OF.items()

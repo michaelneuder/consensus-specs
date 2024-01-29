@@ -1,11 +1,11 @@
 from typing import Dict
 
 from .base import BaseSpecBuilder
-from ..constants import MAXEB
+from ..constants import EIP7251
 
 
-class MAXEBSpecBuilder(BaseSpecBuilder):
-    fork: str = MAXEB
+class EIP7251SpecBuilder(BaseSpecBuilder):
+    fork: str = EIP7251
 
     @classmethod
     def imports(cls, preset_name: str):

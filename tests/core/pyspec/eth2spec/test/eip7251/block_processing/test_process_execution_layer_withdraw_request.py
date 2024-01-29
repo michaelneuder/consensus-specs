@@ -3,7 +3,7 @@ import random
 from eth2spec.test.context import (
     spec_state_test,
     expect_assertion_error,
-    with_maxeb_and_later,
+    with_eip7251_and_later,
     with_presets, 
 )
 from eth2spec.test.helpers.constants import MAINNET, MINIMAL
@@ -34,8 +34,9 @@ from eth2spec.test.helpers.withdrawals import set_eth1_withdrawal_credential_wit
 ## test_success_excess_balance_but_no_max_effective_balance
 
 
+#### Modified tests from 7002. Just testing EL-triggered exits, not partial withdrawals
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_basic_exit(spec, state):
     # move state forward SHARD_COMMITTEE_PERIOD epochs to allow for exit
@@ -55,7 +56,7 @@ def test_basic_exit(spec, state):
     yield from run_execution_layer_withdraw_request_processing(spec, state, execution_layer_withdraw_request)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_incorrect_source_address(spec, state):
     # move state forward SHARD_COMMITTEE_PERIOD epochs to allow for exit
@@ -76,7 +77,7 @@ def test_incorrect_source_address(spec, state):
     yield from run_execution_layer_withdraw_request_processing(spec, state, execution_layer_withdraw_request, success=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_incorrect_withdrawal_credential_prefix(spec, state):
     # move state forward SHARD_COMMITTEE_PERIOD epochs to allow for exit
@@ -101,7 +102,7 @@ def test_incorrect_withdrawal_credential_prefix(spec, state):
     yield from run_execution_layer_withdraw_request_processing(spec, state, execution_layer_withdraw_request, success=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_on_exit_initiated_validator(spec, state):
     # move state forward SHARD_COMMITTEE_PERIOD epochs to allow for exit
@@ -123,7 +124,7 @@ def test_on_exit_initiated_validator(spec, state):
     yield from run_execution_layer_withdraw_request_processing(spec, state, execution_layer_withdraw_request, success=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_activation_epoch_less_than_shard_committee_period(spec, state):
     current_epoch = spec.get_current_epoch(state)

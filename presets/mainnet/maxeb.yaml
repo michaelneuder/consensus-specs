@@ -1,11 +1,11 @@
-# Mainnet preset - MAXEB
+# Mainnet preset - EIP7251
 
 # Gwei values
 # ---------------------------------------------------------------
 # 2**5 * 10**9 (= 32,000,000,000) Gwei
 MIN_ACTIVATION_BALANCE: 32000000000
 # 2**11 * 10**9 (= 2,048,000,000,000) Gwei
-MAX_EFFECTIVE_BALANCE_MAXEB: 2048000000000
+MAX_EFFECTIVE_BALANCE_EIP7251: 2048000000000
 
 # State list lengths
 # ---------------------------------------------------------------
@@ -13,7 +13,7 @@ PENDING_CONSOLIDATIONS_LIMIT: 262144
 
 # Reward and penalty quotients
 # ---------------------------------------------------------------
-MIN_SLASHING_PENALTY_QUOTIENT_MAXEB: 65536 
+MIN_SLASHING_PENALTY_QUOTIENT_EIP7251: 65536 
 
 # Max operations per block
 # ---------------------------------------------------------------

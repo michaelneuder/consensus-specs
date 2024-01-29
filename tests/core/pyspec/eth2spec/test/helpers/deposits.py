@@ -393,11 +393,11 @@ def run_deposit_receipt_processing_with_specific_fork_version(
 
 
 #  ********************
-#  *      MAXEB       *
+#  *      EIP7251       *
 #  ********************
     
 
-def run_deposit_processing_maxeb(spec, state, deposit, validator_index, valid=True, effective=True):
+def run_deposit_processing_eip7251(spec, state, deposit, validator_index, valid=True, effective=True):
     """
     Run ``process_deposit``, yielding:
       - pre-state ('pre')
@@ -449,7 +449,7 @@ def run_deposit_processing_maxeb(spec, state, deposit, validator_index, valid=Tr
     assert state.eth1_deposit_index == state.eth1_data.deposit_count
 
 
-def run_deposit_processing_maxeb_with_specific_fork_version(
+def run_deposit_processing_eip7251_with_specific_fork_version(
         spec,
         state,
         fork_version,
@@ -474,4 +474,4 @@ def run_deposit_processing_maxeb_with_specific_fork_version(
     state.eth1_data.deposit_root = root
     state.eth1_data.deposit_count = 1
 
-    yield from run_deposit_processing_maxeb(spec, state, deposit, validator_index, valid=valid, effective=effective)
+    yield from run_deposit_processing_eip7251(spec, state, deposit, validator_index, valid=valid, effective=effective)

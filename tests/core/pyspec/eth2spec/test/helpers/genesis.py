@@ -6,7 +6,7 @@ from eth2spec.test.helpers.execution_payload import (
     compute_el_header_block_hash,
 )
 from eth2spec.test.helpers.forks import (
-    is_post_altair, is_post_bellatrix, is_post_capella, is_post_eip6110, is_post_maxeb, is_post_eip7002, is_post_whisk,
+    is_post_altair, is_post_bellatrix, is_post_capella, is_post_eip6110, is_post_eip7251, is_post_eip7002, is_post_whisk,
 )
 from eth2spec.test.helpers.keys import pubkeys
 from eth2spec.test.helpers.whisk import compute_whisk_initial_tracker_cached, compute_whisk_initial_k_commitment_cached
@@ -137,7 +137,7 @@ def create_genesis_state(spec, validator_balances, activation_threshold):
     if is_post_eip6110(spec):
         state.deposit_receipts_start_index = spec.UNSET_DEPOSIT_RECEIPTS_START_INDEX
     
-    if is_post_maxeb(spec):
+    if is_post_eip7251(spec):
         state.deposit_balance_to_consume = 0
         state.exit_balance_to_consume = 0
         state.earliest_exit_epoch = spec.GENESIS_EPOCH

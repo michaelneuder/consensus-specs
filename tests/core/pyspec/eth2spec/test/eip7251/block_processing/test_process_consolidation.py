@@ -1,7 +1,7 @@
 from eth2spec.test.helpers.constants import (MINIMAL, MAINNET)
 from eth2spec.test.context import (
     spec_state_test,
-    with_maxeb_and_later,
+    with_eip7251_and_later,
     with_presets, 
     always_bls,
     spec_test, single_phase,
@@ -23,7 +23,7 @@ from eth2spec.test.helpers.withdrawals import (
 #  * CONSOLIDATION TESTS *
 #  ***********************
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
@@ -54,7 +54,7 @@ def test_basic_consolidation(spec, state):
     # Check exit epoch
     assert state.validators[0].exit_epoch == expected_exit_epoch
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
@@ -85,7 +85,7 @@ def test_basic_consolidation_with_compounding_credential(spec, state):
     # Check exit epoch
     assert state.validators[0].exit_epoch == expected_exit_epoch
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
@@ -119,7 +119,7 @@ def test_consolidation_churn_limit_balance(spec, state):
     # Check exit epoch
     assert state.validators[0].exit_epoch == expected_exit_epoch
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
@@ -154,7 +154,7 @@ def test_consolidation_balance_larger_than_churn_limit(spec, state):
     assert state.validators[0].exit_epoch == expected_exit_epoch
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
@@ -191,7 +191,7 @@ def test_consolidation_balance_twice_the_churn_limit(spec, state):
 
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
@@ -234,7 +234,7 @@ def test_multiple_consolidations_below_churn(spec, state):
         assert state.validators[2*i].exit_epoch == expected_exit_epoch
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
@@ -277,7 +277,7 @@ def test_multiple_consolidations_equal_churn(spec, state):
         assert state.validators[2*i].exit_epoch == expected_exit_epoch
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
@@ -335,7 +335,7 @@ def test_multiple_consolidations_above_churn(spec, state):
         assert state.validators[2*i].exit_epoch == expected_exit_epoch
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
@@ -382,7 +382,7 @@ def test_multiple_consolidations_equal_twice_churn(spec, state):
 
 ## Failing tests
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_source_equals_target(spec, state):
     current_epoch = spec.get_current_epoch(state)
@@ -397,7 +397,7 @@ def test_invalid_source_equals_target(spec, state):
                                              validator_privkey, validator_privkey)
     yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_exceed_pending_consolidations_limit(spec, state):
     state.pending_consolidations = [spec.PendingConsolidation(source_index = 0,target_index = 1)] * spec.PENDING_CONSOLIDATIONS_LIMIT
@@ -413,7 +413,7 @@ def test_invalid_exceed_pending_consolidations_limit(spec, state):
     yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_exited_source(spec, state):
     current_epoch = spec.get_current_epoch(state)
@@ -429,7 +429,7 @@ def test_invalid_exited_source(spec, state):
     yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_exited_target(spec, state):
     current_epoch = spec.get_current_epoch(state)
@@ -445,7 +445,7 @@ def test_invalid_exited_target(spec, state):
     spec.initiate_validator_exit(state, 1)
     yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_inactive_source(spec, state):
     current_epoch = spec.get_current_epoch(state)
@@ -461,7 +461,7 @@ def test_invalid_inactive_source(spec, state):
     yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_inactive_target(spec, state):
     current_epoch = spec.get_current_epoch(state)
@@ -478,7 +478,7 @@ def test_invalid_inactive_target(spec, state):
     yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_no_execution_withdrawal_credential(spec, state):
     current_epoch = spec.get_current_epoch(state)
@@ -489,7 +489,7 @@ def test_invalid_no_execution_withdrawal_credential(spec, state):
                                             source_privkey, target_privkey)
     yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_different_credentials(spec, state):
     current_epoch = spec.get_current_epoch(state)
@@ -504,7 +504,7 @@ def test_invalid_different_credentials(spec, state):
     yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
 
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 @always_bls
 def test_invalid_source_signature(spec, state):
@@ -521,7 +521,7 @@ def test_invalid_source_signature(spec, state):
     state.validators[0].pubkey = state.validators[1].pubkey
     yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 @always_bls
 def test_invalid_target_signature(spec, state):
@@ -538,7 +538,7 @@ def test_invalid_target_signature(spec, state):
     state.validators[1].pubkey = state.validators[2].pubkey
     yield from run_consolidation_processing(spec, state, signed_consolidation, valid=False)
 
-@with_maxeb_and_later
+@with_eip7251_and_later
 @spec_state_test
 def test_invalid_before_specified_epoch(spec, state):
     current_epoch = spec.get_current_epoch(state)

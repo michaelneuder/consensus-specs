@@ -1,4 +1,4 @@
-# MAXEB -- Fork Logic
+# EIP7251 -- Fork Logic
 
 **Notice**: This document is a work-in-progress for researchers and implementers.
 
@@ -20,7 +20,7 @@
 
 ## Introduction
 
-This document describes the process of MAXEB upgrade.
+This document describes the process of the EIP7251 upgrade.
 
 ## Configuration
 
@@ -28,8 +28,8 @@ Warning: this configuration is not definitive.
 
 | Name | Value |
 | - | - |
-| `MAXEB_FORK_VERSION` | `Version('0x06000000')` |
-| `MAXEB_FORK_EPOCH` | `Epoch(18446744073709551615)` **TBD** |
+| `EIP7251_FORK_VERSION` | `Version('0x06000000')` |
+| `EIP7251_FORK_EPOCH` | `Epoch(18446744073709551615)` **TBD** |
 
 ## Helper functions
 
@@ -42,8 +42,8 @@ def compute_fork_version(epoch: Epoch) -> Version:
     """
     Return the fork version at the given ``epoch``.
     """
-    if epoch >= MAXEB_FORK_EPOCH:
-        return MAXEB_FORK_VERSION
+    if epoch >= EIP7251_FORK_EPOCH:
+        return EIP7251_FORK_VERSION
     if epoch >= DENEB_FORK_EPOCH:
         return DENEB_FORK_VERSION
     if epoch >= CAPELLA_FORK_EPOCH:
@@ -55,22 +55,22 @@ def compute_fork_version(epoch: Epoch) -> Version:
     return GENESIS_FORK_VERSION
 ```
 
-## Fork to MAXEB
+## Fork to EIP7251
 
 ### Fork trigger
 
 TBD. This fork is defined for testing purposes, the EIP may be combined with other consensus-layer upgrade.
-For now, we assume the condition will be triggered at epoch `MAXEB_FORK_EPOCH`.
+For now, we assume the condition will be triggered at epoch `EIP7251_FORK_EPOCH`.
 
-Note that for the pure MAXEB networks, we don't apply `upgrade_to_maxeb` since it starts with MAXEB version logic.
+Note that for the pure EIP7251 networks, we don't apply `upgrade_to_eip7251` since it starts with EIP7251 version logic.
 
 ### Upgrading the state
 
-If `state.slot % SLOTS_PER_EPOCH == 0` and `compute_epoch_at_slot(state.slot) == MAXEB_FORK_EPOCH`,
-an irregular state change is made to upgrade to MAXEB.
+If `state.slot % SLOTS_PER_EPOCH == 0` and `compute_epoch_at_slot(state.slot) == EIP7251_FORK_EPOCH`,
+an irregular state change is made to upgrade to EIP7251.
 
 ```python
-def upgrade_to_maxeb(pre: deneb.BeaconState) -> BeaconState:
+def upgrade_to_eip7251(pre: deneb.BeaconState) -> BeaconState:
     post = BeaconState(
         # Versioning
         genesis_time=pre.genesis_time,
@@ -78,7 +78,7 @@ def upgrade_to_maxeb(pre: deneb.BeaconState) -> BeaconState:
         slot=pre.slot,
         fork=Fork(
             previous_version=pre.fork.current_version,
-            current_version=MAXEB_FORK_VERSION,
+            current_version=EIP7251_FORK_VERSION,
             epoch=deneb.get_current_epoch(pre),
         ),
         # History
@@ -117,7 +117,7 @@ def upgrade_to_maxeb(pre: deneb.BeaconState) -> BeaconState:
         next_withdrawal_validator_index=pre.next_withdrawal_validator_index,
         # Deep history valid from Capella onwards
         historical_summaries=pre.historical_summaries,
-            # --- NEW in MaxEB--- #
+            # --- New in EIP7251--- #
         deposit_balance_to_consume = 0,
         exit_balance_to_consume = get_activation_exit_churn_limit(pre),
         earliest_exit_epoch = max([v.exit_epoch for v in pre.validators if v.exit_epoch != FAR_FUTURE_EPOCH]) + 1,
