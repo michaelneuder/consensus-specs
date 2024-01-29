@@ -506,7 +506,8 @@ def test_invalid_different_credentials(spec, state):
 
 @with_maxeb_and_later
 @spec_state_test
-def test_invalid_inactive_source_signature(spec, state):
+@always_bls
+def test_invalid_source_signature(spec, state):
     current_epoch = spec.get_current_epoch(state)
     source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
     target_privkey = pubkey_to_privkey[state.validators[1].pubkey]
@@ -522,7 +523,8 @@ def test_invalid_inactive_source_signature(spec, state):
 
 @with_maxeb_and_later
 @spec_state_test
-def test_invalid_inactive_target_signature(spec, state):
+@always_bls
+def test_invalid_target_signature(spec, state):
     current_epoch = spec.get_current_epoch(state)
     source_privkey = pubkey_to_privkey[state.validators[0].pubkey]
     target_privkey = pubkey_to_privkey[state.validators[1].pubkey]

@@ -13,6 +13,8 @@ class MAXEBSpecBuilder(BaseSpecBuilder):
 from eth2spec.deneb import {preset_name} as deneb
 '''
 
+## TODO: deal with changed gindices
+    
     @classmethod
     def hardcoded_ssz_dep_constants(cls) -> Dict[str, str]:
         return {
@@ -20,3 +22,4 @@ from eth2spec.deneb import {preset_name} as deneb
             'CURRENT_SYNC_COMMITTEE_GINDEX': 'GeneralizedIndex(86)',
             'NEXT_SYNC_COMMITTEE_GINDEX': 'GeneralizedIndex(87)',
         }
+
