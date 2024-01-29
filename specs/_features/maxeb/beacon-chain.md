@@ -338,7 +338,7 @@ def get_activation_exit_churn_limit(state: BeaconState) -> Gwei:
     return min(MAX_PER_EPOCH_ACTIVATION_EXIT_CHURN_LIMIT, get_churn_limit(state))
 ```
 
-#### New `get_activation_exit_churn_limit`
+#### New `get_consolidation_churn_limit`
 ```python
 def get_consolidation_churn_limit(state: BeaconState) -> Gwei:
     return get_churn_limit(state) - get_activation_exit_churn_limit(state)
