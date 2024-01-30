@@ -1,19 +1,10 @@
-import random
-
 from eth2spec.test.context import (
     spec_state_test,
     expect_assertion_error,
     with_eip7251_and_later,
     with_presets, 
 )
-from eth2spec.test.helpers.constants import MAINNET, MINIMAL
-from eth2spec.test.helpers.execution_payload import (
-    build_empty_execution_payload,
-    compute_el_block_hash,
-)
-from eth2spec.test.helpers.random import (
-    randomize_state,
-)
+from eth2spec.test.helpers.constants import MINIMAL
 from eth2spec.test.helpers.state import (
     next_epoch,
     next_slot,
@@ -146,6 +137,30 @@ def test_activation_epoch_less_than_shard_committee_period(spec, state):
 
 
 
+## Partial withdrawals tests
+    
+
+@with_eip7251_and_later
+@spec_state_test
+@with_presets([MINIMAL])
+def test_partial_withdrawal_queue_full(spec, state):
+    state.slot += spec.config.SHARD_COMMITTEE_PERIOD * spec.SLOTS_PER_EPOCH
+    current_epoch = spec.get_current_epoch(state)
+    validator_index = spec.get_active_validator_indices(state, current_epoch)[0]
+    validator_pubkey = state.validators[validator_index].pubkey
+    address = b'\x22' * 20
+    set_eth1_withdrawal_credential_with_balance(spec, state, validator_index, address=address)
+    execution_layer_withdraw_request = spec.ExecutionLayerWithdrawRequest(
+        source_address=address,
+        validator_pubkey=validator_pubkey,
+        amount = 10**9,
+    )
+
+    partial_withdrawal = spec.PartialWithdrawal(index=0,amount=1,withdrawable_epoch=current_epoch)
+    state.pending_partial_withdrawals = [partial_withdrawal] * spec.PENDING_PARTIAL_WITHDRAWALS_LIMIT
+    yield from run_execution_layer_withdraw_request_processing(spec, state, execution_layer_withdraw_request, success=False)
+
+
 
 #
 # Run processing
@@ -172,6 +187,8 @@ def run_execution_layer_withdraw_request_processing(spec, state, execution_layer
         return
 
     pre_exit_epoch = state.validators[validator_index].exit_epoch
+    pre_pending_partial_withdrawals = state.pending_partial_withdrawals
+    pre_balance = state.balances[validator_index]
 
     spec.process_execution_layer_withdraw_request(state, execution_layer_withdraw_request)
 
@@ -183,4 +200,13 @@ def run_execution_layer_withdraw_request_processing(spec, state, execution_layer
             assert state.validators[validator_index].exit_epoch < spec.FAR_FUTURE_EPOCH
         else:
             assert state.validators[validator_index].exit_epoch == pre_exit_epoch
-
+    else:
+        if success:
+            assert state.validators[validator_index].exit_epoch == spec.FAR_FUTURE_EPOCH
+            assert state.balances[validator_index] == pre_balance
+            post_length = len(state.pending_partial_withdrawals)
+            assert post_length == len(pre_pending_partial_withdrawals) + 1
+            assert post_length < spec.PENDING_PARTIAL_WITHDRAWALS_LIMIT
+            assert state.pending_partial_withdrawals[post_length-1].validator_index == validator_index
+        else:
+            assert state.pending_partial_withdrawals == pre_pending_partial_withdrawals

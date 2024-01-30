@@ -47,7 +47,7 @@ GeneralizedIndex = NewType('GeneralizedIndex', int)
 T = TypeVar('T')  # For generic function
 
 
-fork = 'maxeb'
+fork = 'eip7251'
 
 
 def ceillog2(x: int) -> uint64:
@@ -328,9 +328,11 @@ MAX_BLOB_COMMITMENTS_PER_BLOCK = uint64(16)
 MAX_BLOBS_PER_BLOCK = uint64(6)
 MIN_ACTIVATION_BALANCE = Gwei(32000000000)
 MAX_EFFECTIVE_BALANCE_EIP7251 = Gwei(2048000000000)
-MIN_SLASHING_PENALTY_QUOTIENT_MAXEB = Gwei(65536)
+MIN_SLASHING_PENALTY_QUOTIENT_EIP7251 = Gwei(65536)
 MAX_CONSOLIDATIONS = uint64(1)
-PENDING_CONSOLIDATIONS_LIMIT = uint64(262144)
+PENDING_BALANCE_DEPOSITS_LIMIT = uint64(134217728)
+PENDING_PARTIAL_WITHDRAWALS_LIMIT = uint64(64)
+PENDING_CONSOLIDATIONS_LIMIT = uint64(64)
 
 
 class Configuration(NamedTuple):
@@ -384,10 +386,10 @@ class Configuration(NamedTuple):
     MAX_PER_EPOCH_ACTIVATION_CHURN_LIMIT: uint64
     DENEB_FORK_VERSION: Version
     DENEB_FORK_EPOCH: Epoch
-    MIN_PER_EPOCH_CHURN_LIMIT_MAXEB: Gwei
+    MIN_PER_EPOCH_CHURN_LIMIT_EIP7251: Gwei
     MAX_PER_EPOCH_ACTIVATION_EXIT_CHURN_LIMIT: Gwei
-    MAXEB_FORK_VERSION: Version
-    MAXEB_FORK_EPOCH: Epoch
+    EIP7251_FORK_VERSION: Version
+    EIP7251_FORK_EPOCH: Epoch
 
 
 config = Configuration(
@@ -441,10 +443,10 @@ config = Configuration(
     MAX_PER_EPOCH_ACTIVATION_CHURN_LIMIT=uint64(4),
     DENEB_FORK_VERSION=Version('0x04000001'),
     DENEB_FORK_EPOCH=Epoch(18446744073709551615),
-    MIN_PER_EPOCH_CHURN_LIMIT_MAXEB=Gwei(64000000000),
+    MIN_PER_EPOCH_CHURN_LIMIT_EIP7251=Gwei(64000000000),
     MAX_PER_EPOCH_ACTIVATION_EXIT_CHURN_LIMIT=Gwei(128000000000),
-    MAXEB_FORK_VERSION=Version('0x06000000'),
-    MAXEB_FORK_EPOCH=Epoch(18446744073709551615),
+    EIP7251_FORK_VERSION=Version('0x06000000'),
+    EIP7251_FORK_EPOCH=Epoch(18446744073709551615),
 )
 
 
@@ -827,7 +829,7 @@ class BeaconBlockBody(Container):
     execution_payload: ExecutionPayload
     bls_to_execution_changes: List[SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES]
     blob_kzg_commitments: List[KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK]
-    consolidations: List[SignedConsolidation, MAX_CONSOLIDATIONS]  # [New in MAXEB]
+    consolidations: List[SignedConsolidation, MAX_CONSOLIDATIONS]  # [New in EIP7251]
 
 
 class BeaconBlock(Container):
@@ -890,10 +892,10 @@ class BeaconState(Container):
     next_withdrawal_validator_index: ValidatorIndex
     # Deep history valid from Capella onwards
     historical_summaries: List[HistoricalSummary, HISTORICAL_ROOTS_LIMIT]
-    # --- New --- #
+    # --- New in EIP7251--- #
     deposit_balance_to_consume: Gwei
-    exit_balance_to_consume: Gwei  # Initialized with get_activation_exit_churn_limit(state)
-    earliest_exit_epoch: Epoch  # Initialized with the max([v.exit_epoch for v in state.validators if v.exit_epoch != FAR_FUTURE_EPOCH]) + 1
+    exit_balance_to_consume: Gwei
+    earliest_exit_epoch: Epoch
     consolidation_balance_to_consume: Gwei
     earliest_consolidation_epoch: Epoch
     pending_balance_deposits: List[PendingBalanceDeposit, 100000]
@@ -1129,9 +1131,7 @@ def is_eligible_for_activation_queue(validator: Validator) -> bool:
     """
     return (
         validator.activation_eligibility_epoch == FAR_FUTURE_EPOCH
-        # --- MODIFIED --- #
-        and validator.effective_balance >= MIN_ACTIVATION_BALANCE
-        # --- END MODIFIED --- #
+        and validator.effective_balance >= MIN_ACTIVATION_BALANCE # [Modified in EIP7251]
     )
 
 
@@ -1476,7 +1476,7 @@ def initiate_validator_exit(state: BeaconState, index: ValidatorIndex) -> None:
     if validator.exit_epoch != FAR_FUTURE_EPOCH:
         return
 
-    # Compute exit queue epoch
+    # Compute exit queue epoch [Modified in EIP 7251]
     exit_queue_epoch = compute_exit_epoch_and_update_churn(state, validator.effective_balance)
 
     # Set validator exit epoch and withdrawable epoch
@@ -1496,7 +1496,7 @@ def slash_validator(state: BeaconState,
     validator.slashed = True
     validator.withdrawable_epoch = max(validator.withdrawable_epoch, Epoch(epoch + EPOCHS_PER_SLASHINGS_VECTOR))
     state.slashings[epoch % EPOCHS_PER_SLASHINGS_VECTOR] += validator.effective_balance
-    slashing_penalty = validator.effective_balance // MIN_SLASHING_PENALTY_QUOTIENT_MAXEB  # [Modified in MAXEB]
+    slashing_penalty = validator.effective_balance // MIN_SLASHING_PENALTY_QUOTIENT_EIP7251  # [Modified in EIP7251]
     decrease_balance(state, slashed_index, slashing_penalty)
 
 
@@ -1605,8 +1605,8 @@ def process_epoch(state: BeaconState) -> None:
     process_registry_updates(state)
     process_slashings(state)
     process_eth1_data_reset(state)
-    process_pending_balance_deposits(state) # New
-    process_pending_consolidations(state) # New
+    process_pending_balance_deposits(state) # New in EIP7251
+    process_pending_consolidations(state) # New in EIP7251
     process_effective_balance_updates(state)
     process_slashings_reset(state)
     process_randao_mixes_reset(state)
@@ -1896,7 +1896,7 @@ def process_effective_balance_updates(state: BeaconState) -> None:
         HYSTERESIS_INCREMENT = uint64(EFFECTIVE_BALANCE_INCREMENT // HYSTERESIS_QUOTIENT)
         DOWNWARD_THRESHOLD = HYSTERESIS_INCREMENT * HYSTERESIS_DOWNWARD_MULTIPLIER
         UPWARD_THRESHOLD = HYSTERESIS_INCREMENT * HYSTERESIS_UPWARD_MULTIPLIER
-        EFFECTIVE_BALANCE_LIMIT = MAX_EFFECTIVE_BALANCE_EIP7251 if has_compounding_withdrawal_credential(validator) else MIN_ACTIVATION_BALANCE
+        EFFECTIVE_BALANCE_LIMIT = MAX_EFFECTIVE_BALANCE_EIP7251 if has_compounding_withdrawal_credential(validator) else MIN_ACTIVATION_BALANCE # Modified in EIP7251
         if (
             balance + DOWNWARD_THRESHOLD < validator.effective_balance
             or validator.effective_balance + UPWARD_THRESHOLD < balance
@@ -1994,8 +1994,8 @@ def process_operations(state: BeaconState, body: BeaconBlockBody) -> None:
     for_ops(body.deposits, process_deposit)
     for_ops(body.voluntary_exits, process_voluntary_exit)
     for_ops(body.bls_to_execution_changes, process_bls_to_execution_change)
-    for_ops(body.execution_payload.withdraw_requests, process_execution_layer_withdraw_request) # New
-    for_ops(body.consolidations, process_consolidation) # New
+    for_ops(body.execution_payload.withdraw_requests, process_execution_layer_withdraw_request) # New in EIP7251
+    for_ops(body.consolidations, process_consolidation) # New in EIP7251
 
 
 def process_proposer_slashing(state: BeaconState, proposer_slashing: ProposerSlashing) -> None:
@@ -2079,7 +2079,7 @@ def get_validator_from_deposit(pubkey: BLSPubkey, withdrawal_credentials: Bytes3
         activation_epoch=FAR_FUTURE_EPOCH,
         exit_epoch=FAR_FUTURE_EPOCH,
         withdrawable_epoch=FAR_FUTURE_EPOCH,
-        effective_balance=0,
+        effective_balance=0, # [Modified in EIP7251]
     )
 
 
@@ -2116,7 +2116,6 @@ def apply_deposit(state: BeaconState,
         if bls.Verify(pubkey, signing_root, signature):
             state.validators.append(get_validator_from_deposit(pubkey, withdrawal_credentials))
             state.balances.append(0)
-            # [New in Altair]
             state.previous_epoch_participation.append(ParticipationFlags(0b0000_0000))
             state.current_epoch_participation.append(ParticipationFlags(0b0000_0000))
             state.inactivity_scores.append(uint64(0))
@@ -3134,8 +3133,8 @@ def compute_fork_version(epoch: Epoch) -> Version:
     """
     Return the fork version at the given ``epoch``.
     """
-    if epoch >= config.MAXEB_FORK_EPOCH:
-        return config.MAXEB_FORK_VERSION
+    if epoch >= config.EIP7251_FORK_EPOCH:
+        return config.EIP7251_FORK_VERSION
     if epoch >= config.DENEB_FORK_EPOCH:
         return config.DENEB_FORK_VERSION
     if epoch >= config.CAPELLA_FORK_EPOCH:
@@ -3950,9 +3949,7 @@ def is_fully_withdrawable_validator(validator: Validator, balance: Gwei, epoch: 
     Check if ``validator`` is fully withdrawable.
     """
     return (
-        # --- MODIFIED --- #
-        (has_eth1_withdrawal_credential(validator) or has_compounding_withdrawal_credential(validator))
-        # --- END MODIFIED --- #
+        (has_eth1_withdrawal_credential(validator) or has_compounding_withdrawal_credential(validator)) # [Modified in EIP7251]
         and validator.withdrawable_epoch <= epoch
         and balance > 0
     )
@@ -4874,7 +4871,7 @@ def get_churn_limit(state: BeaconState) -> Gwei:
     """
     Return the churn limit for the current epoch.
     """
-    churn = max(config.MIN_PER_EPOCH_CHURN_LIMIT_MAXEB,
+    churn = max(config.MIN_PER_EPOCH_CHURN_LIMIT_EIP7251,
                 get_total_active_balance(state) // config.CHURN_LIMIT_QUOTIENT)
     return churn - churn % EFFECTIVE_BALANCE_INCREMENT
 
@@ -4942,7 +4939,11 @@ def process_pending_balance_deposits(state: BeaconState) -> None:
 
 
 def get_active_balance(state: BeaconState, validator_index: ValidatorIndex) -> Gwei:
-    active_balance_ceil = MIN_ACTIVATION_BALANCE if has_eth1_withdrawal_credential(state.validators[validator_index]) else MAX_EFFECTIVE_BALANCE_EIP7251
+    active_balance_ceil = (
+        MIN_ACTIVATION_BALANCE
+        if has_eth1_withdrawal_credential(state.validators[validator_index])
+        else MAX_EFFECTIVE_BALANCE_EIP7251
+    )
     return min(state.balances[validator_index], active_balance_ceil)
 
 
@@ -4973,10 +4974,16 @@ def process_execution_layer_withdraw_request(
         state: BeaconState,
         execution_layer_withdraw_request: ExecutionLayerWithdrawRequest
     ) -> None:
+    amount = execution_layer_withdraw_request.amount
+    is_full_exit_request = amount == 0
+    # If partial withdrawal queue is full, only full exits are processed
+    if not (is_full_exit_request or len(state.pending_consolidations) < PENDING_PARTIAL_WITHDRAWALS_LIMIT):
+        return
+
     validator_pubkeys = [v.pubkey for v in state.validators]
     validator_index = ValidatorIndex(validator_pubkeys.index(execution_layer_withdraw_request.validator_pubkey))
     validator = state.validators[validator_index]
-    amount = execution_layer_withdraw_request.amount
+
 
     # Same conditions as in EIP7002 https://github.com/ethereum/consensus-specs/pull/3349/files#diff-7a6e2ba480d22d8bd035bd88ca91358456caf9d7c2d48a74e1e900fe63d5c4f8R223
     # Verify withdrawal credentials
@@ -4994,8 +5001,7 @@ def process_execution_layer_withdraw_request(
     if get_current_epoch(state) < validator.activation_epoch + config.SHARD_COMMITTEE_PERIOD:
         return
 
-    # New condition: only allow partial withdrawals witb compounding withdrawal credentials
-    is_full_exit_request = amount == 0
+    # New condition: only allow partial withdrawals with compounding withdrawal credentials
     if not (is_full_exit_request or has_compounding_withdrawal_credential(validator)):
         return
 
@@ -5015,7 +5021,10 @@ def process_execution_layer_withdraw_request(
 
 
 def process_consolidation(state: BeaconState, signed_consolidation: SignedConsolidation) -> None:
-    assert(len(state.pending_consolidations) < PENDING_CONSOLIDATIONS_LIMIT)
+    # If the pending consolidations queue is full, no consolidations are allowed in the block
+    assert len(state.pending_consolidations) < PENDING_CONSOLIDATIONS_LIMIT
+    # If there is too little available consolidation churn limit, no consolidations are allowed in the block
+    assert get_consolidation_churn_limit(state) > MIN_ACTIVATION_BALANCE
     consolidation = signed_consolidation.message
     # Verify that source != target, so a consolidation cannot be used as an exit.
     assert consolidation.source_index != consolidation.target_index
@@ -5052,7 +5061,7 @@ def process_consolidation(state: BeaconState, signed_consolidation: SignedConsol
                                                              target_index = consolidation.target_index))
 
 
-def upgrade_to_maxeb(pre: deneb.BeaconState) -> BeaconState:
+def upgrade_to_eip7251(pre: deneb.BeaconState) -> BeaconState:
     post = BeaconState(
         # Versioning
         genesis_time=pre.genesis_time,
@@ -5060,7 +5069,7 @@ def upgrade_to_maxeb(pre: deneb.BeaconState) -> BeaconState:
         slot=pre.slot,
         fork=Fork(
             previous_version=pre.fork.current_version,
-            current_version=config.MAXEB_FORK_VERSION,
+            current_version=config.EIP7251_FORK_VERSION,
             epoch=deneb.get_current_epoch(pre),
         ),
         # History
@@ -5099,7 +5108,7 @@ def upgrade_to_maxeb(pre: deneb.BeaconState) -> BeaconState:
         next_withdrawal_validator_index=pre.next_withdrawal_validator_index,
         # Deep history valid from Capella onwards
         historical_summaries=pre.historical_summaries,
-            # --- NEW in MaxEB--- #
+            # --- New in EIP7251--- #
         deposit_balance_to_consume = 0,
         exit_balance_to_consume = get_activation_exit_churn_limit(pre),
         earliest_exit_epoch = max([v.exit_epoch for v in pre.validators if v.exit_epoch != FAR_FUTURE_EPOCH]) + 1,

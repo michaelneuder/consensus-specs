@@ -1,4 +1,4 @@
-from eth2spec.test.helpers.constants import (MINIMAL, MAINNET)
+from eth2spec.test.helpers.constants import MINIMAL
 from eth2spec.test.context import (
     spec_state_test,
     with_eip7251_and_later,
@@ -24,11 +24,12 @@ from eth2spec.test.helpers.withdrawals import (
 #  ***********************
 
 @with_eip7251_and_later
+@with_presets([MINIMAL], "need sufficient consolidation churn limit")
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
-@with_presets([MINIMAL])
 def test_basic_consolidation(spec, state):
+    print(spec.PRESET_BASE)
     # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
     consolidation_churn_limit = spec.get_consolidation_churn_limit(state)
     # Set the consolidation balance to consume equal to churn limit
@@ -55,10 +56,10 @@ def test_basic_consolidation(spec, state):
     assert state.validators[0].exit_epoch == expected_exit_epoch
 
 @with_eip7251_and_later
+@with_presets([MINIMAL], "need sufficient consolidation churn limit")
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
-@with_presets([MINIMAL])
 def test_basic_consolidation_with_compounding_credential(spec, state):
     # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
     consolidation_churn_limit = spec.get_consolidation_churn_limit(state)
@@ -86,10 +87,10 @@ def test_basic_consolidation_with_compounding_credential(spec, state):
     assert state.validators[0].exit_epoch == expected_exit_epoch
 
 @with_eip7251_and_later
+@with_presets([MINIMAL], "need sufficient consolidation churn limit")
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
-@with_presets([MINIMAL])
 def test_consolidation_churn_limit_balance(spec, state):
     # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
     consolidation_churn_limit = spec.get_consolidation_churn_limit(state)
@@ -120,10 +121,10 @@ def test_consolidation_churn_limit_balance(spec, state):
     assert state.validators[0].exit_epoch == expected_exit_epoch
 
 @with_eip7251_and_later
+@with_presets([MINIMAL], "need sufficient consolidation churn limit")
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
-@with_presets([MINIMAL])
 def test_consolidation_balance_larger_than_churn_limit(spec, state):
     # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
     consolidation_churn_limit = spec.get_consolidation_churn_limit(state)
@@ -155,10 +156,10 @@ def test_consolidation_balance_larger_than_churn_limit(spec, state):
 
 
 @with_eip7251_and_later
+@with_presets([MINIMAL], "need sufficient consolidation churn limit")
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
-@with_presets([MINIMAL])
 def test_consolidation_balance_twice_the_churn_limit(spec, state):
     # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
     consolidation_churn_limit = spec.get_consolidation_churn_limit(state)
@@ -192,10 +193,10 @@ def test_consolidation_balance_twice_the_churn_limit(spec, state):
 
 
 @with_eip7251_and_later
+@with_presets([MINIMAL], "need sufficient consolidation churn limit")
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
-@with_presets([MINIMAL])
 def test_multiple_consolidations_below_churn(spec, state):
     # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
     consolidation_churn_limit = spec.get_consolidation_churn_limit(state)
@@ -235,10 +236,10 @@ def test_multiple_consolidations_below_churn(spec, state):
 
 
 @with_eip7251_and_later
+@with_presets([MINIMAL], "need sufficient consolidation churn limit")
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
-@with_presets([MINIMAL])
 def test_multiple_consolidations_equal_churn(spec, state):
     # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
     consolidation_churn_limit = spec.get_consolidation_churn_limit(state)
@@ -278,10 +279,10 @@ def test_multiple_consolidations_equal_churn(spec, state):
 
 
 @with_eip7251_and_later
+@with_presets([MINIMAL], "need sufficient consolidation churn limit")
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
-@with_presets([MINIMAL])
 def test_multiple_consolidations_above_churn(spec, state):
     # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
     consolidation_churn_limit = spec.get_consolidation_churn_limit(state)
@@ -336,10 +337,10 @@ def test_multiple_consolidations_above_churn(spec, state):
 
 
 @with_eip7251_and_later
+@with_presets([MINIMAL], "need sufficient consolidation churn limit")
 @with_custom_state(balances_fn=scaled_churn_balances_exceed_activation_exit_churn_limit, threshold_fn=default_activation_threshold)
 @spec_test
 @single_phase
-@with_presets([MINIMAL])
 def test_multiple_consolidations_equal_twice_churn(spec, state):
     # This state has 256 validators each with 32 ETH in MINIMAL preset, 128 ETH consolidation churn
     consolidation_churn_limit = spec.get_consolidation_churn_limit(state)

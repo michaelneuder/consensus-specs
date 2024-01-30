@@ -115,7 +115,10 @@ The following values are (non-configurable) constants used throughout the specif
 
 | Name | Value | Unit | Duration |
 | - | - | :-: | :-: |
+| `PENDING_BALANCE_DEPOSITS_LIMIT` | `uint64(2**27)` (= 134,217,728) | pending balance deposits |  |
+| `PENDING_PARTIAL_WITHDRAWALS_LIMIT` | `uint64(2**27)` (= 134,217,728) | pending partial withdrawals |  |
 | `PENDING_CONSOLIDATIONS_LIMIT` | `uint64(2**18)` (= 262,144) | pending consolidations |  |
+
 
 ## Configuration
 
@@ -519,7 +522,11 @@ def process_pending_balance_deposits(state: BeaconState) -> None:
 
 ```python
 def get_active_balance(state: BeaconState, validator_index: ValidatorIndex) -> Gwei:
-    active_balance_ceil = MIN_ACTIVATION_BALANCE if has_eth1_withdrawal_credential(state.validators[validator_index]) else MAX_EFFECTIVE_BALANCE_EIP7251
+    active_balance_ceil = (
+        MIN_ACTIVATION_BALANCE 
+        if has_eth1_withdrawal_credential(state.validators[validator_index]) 
+        else MAX_EFFECTIVE_BALANCE_EIP7251
+    )
     return min(state.balances[validator_index], active_balance_ceil)
 ```
 
@@ -650,10 +657,16 @@ def process_execution_layer_withdraw_request(
         state: BeaconState,
         execution_layer_withdraw_request: ExecutionLayerWithdrawRequest
     ) -> None:
+    amount = execution_layer_withdraw_request.amount
+    is_full_exit_request = amount == 0
+    # If partial withdrawal queue is full, only full exits are processed 
+    if not (is_full_exit_request or len(state.pending_consolidations) < PENDING_PARTIAL_WITHDRAWALS_LIMIT):
+        return
+
     validator_pubkeys = [v.pubkey for v in state.validators]
     validator_index = ValidatorIndex(validator_pubkeys.index(execution_layer_withdraw_request.validator_pubkey))
     validator = state.validators[validator_index]
-    amount = execution_layer_withdraw_request.amount
+
 
     # Same conditions as in EIP7002 https://github.com/ethereum/consensus-specs/pull/3349/files#diff-7a6e2ba480d22d8bd035bd88ca91358456caf9d7c2d48a74e1e900fe63d5c4f8R223
     # Verify withdrawal credentials
@@ -671,8 +684,7 @@ def process_execution_layer_withdraw_request(
     if get_current_epoch(state) < validator.activation_epoch + SHARD_COMMITTEE_PERIOD:
         return
 
-    # New condition: only allow partial withdrawals witb compounding withdrawal credentials
-    is_full_exit_request = amount == 0
+    # New condition: only allow partial withdrawals with compounding withdrawal credentials
     if not (is_full_exit_request or has_compounding_withdrawal_credential(validator)):
         return
 
@@ -751,7 +763,10 @@ def get_expected_withdrawals(state: BeaconState) -> Sequence[Withdrawal]:
 
 ```python
 def process_consolidation(state: BeaconState, signed_consolidation: SignedConsolidation) -> None:
-    assert(len(state.pending_consolidations) < PENDING_CONSOLIDATIONS_LIMIT)
+    # If the pending consolidations queue is full, no consolidations are allowed in the block
+    assert len(state.pending_consolidations) < PENDING_CONSOLIDATIONS_LIMIT
+    # If there is too little available consolidation churn limit, no consolidations are allowed in the block
+    assert get_consolidation_churn_limit(state) > MIN_ACTIVATION_BALANCE
     consolidation = signed_consolidation.message
     # Verify that source != target, so a consolidation cannot be used as an exit.
     assert consolidation.source_index != consolidation.target_index
